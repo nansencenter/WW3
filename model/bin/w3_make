@@ -135,7 +135,8 @@
 
 # GRID STRT BOUND OUTF OUTP TRCK GRIB GINT GX* UPRSTR LIBWW3
 #  reg_programs = non-NetCDF programs
-  reg_programs="ww3_strt"
+  reg_programs="ww3_grid" 
+  reg_programs="$reg_programs ww3_strt"
   reg_programs="$reg_programs ww3_bound"
   reg_programs="$reg_programs ww3_outf"
   reg_programs="$reg_programs ww3_outp"
@@ -170,7 +171,6 @@
   # MULTI MULTI_ESMF SBS1
   if [ -n "`grep SCRIPNC $switch_file`" ] || [ -n "`grep OASIS $switch_file`" ]  || [ -n "`grep PDLIB $switch_file`" ]
   then
-    cdf_programs="$cdf_programs ww3_grid"
     cdf_programs="$cdf_programs ww3_multi"
     cdf_programs="$cdf_programs ww3_sbs1"
     cdf_programs="$cdf_programs libww3"
@@ -179,7 +179,6 @@
       cdf_programs="$cdf_programs ww3_multi_esmf"
     fi
   else
-    reg_programs="$reg_programs ww3_grid"
     reg_programs="$reg_programs ww3_multi"
     reg_programs="$reg_programs ww3_sbs1"
     reg_programs="$reg_programs libww3"
@@ -193,8 +192,15 @@
   if [ -n "`grep TRKNC $switch_file`" ]
   then
     cdf_programs="$cdf_programs ww3_systrk"
+    systrck_nc4notrknc=0
   else
-    reg_programs="$reg_programs ww3_systrk"
+    if [ -n "`grep NC4 $switch_file`" ]
+    then
+      systrck_nc4notrknc=1
+    else
+      systrck_nc4notrknc=0
+      reg_programs="$reg_programs ww3_systrk"
+    fi
   fi
 
   # SHEL PREP GSPL
@@ -245,6 +251,7 @@
 # 1.e Set sequential or parallel folders - - - - - - - - - - - - - - - - - - -
 
   flag_SHRD=`grep SHRD $switch_file | wc -l | awk '{ print $1}'`
+  flag_OMPX=`grep OMPX $switch_file | wc -l | awk '{ print $1}'`
   flag_OMPH=`grep OMPH $switch_file | wc -l | awk '{ print $1}'`
 
   switch_file_old=$main_dir/bin/switch.old
@@ -255,7 +262,12 @@
 
   if [ "$flag_SHRD" -gt '0' ]
   then
-    pres_type='SEQ'
+    if [ "$flag_OMPX" -gt '0' ]
+    then
+      pres_type='OMP'
+    else
+      pres_type='SEQ'
+    fi
   else
     if [ "$flag_OMPH" -gt '0' ]
     then
@@ -294,10 +306,16 @@
 *****************************************************************
 
 Compile of WAVEWATCH III NetCDF enabled programs requires the
-environment variable WWATCH3_NETCDF be set to NC4 (compile with 
-NetCDF version 4.x). Support for NC3 has been removed. 
+environment variable WWATCH3_NETCDF be set to either NC3 (compile
+with NetCDF version 3.x) or NC4 (compile with NetCDF version 4.x).
 
-For WWATCH3_NETCDF = NC4, then the following environment variables
+If WWATCH3_NETCDF = NC3, then the following environment variables
+are required.
+
+    NETCDF_LIBDIR = <path to NetCDF-3 libraries>
+    NETCDF_INCDIR = <path to NetCDF-3 include>
+
+If WWATCH3_NETCDF = NC4, then the following environment variables
 are required.
 
     NETCDF_CONFIG = <path to NetCDF-4 nc-config utility>
@@ -308,8 +326,12 @@ WWATCH3_NETCDF=NC4 compile.
 
 The NetCDF-4 compile requires NetCDF version 4.1.1 or higher.
 Use "nc-config --version" to check the version of the installed
-NetCDF. Use "nc-config --has-nc4" to check if the installed NetCDF 
-has the NetCDF-4 API enabled.
+NetCDF.
+
+Compiling with the NC4 switch requires WWATCH3_NETCDF=NC4 and the
+NetCDF-4 installation compiled with the NetCDF-4 API enabled.
+Use "nc-config --has-nc4" to check if the installed NetCDF has
+the NetCDF-4 API enabled.
 
 *****************************************************************
 
@@ -331,11 +353,25 @@ EOF
   else
     case $WWATCH3_NETCDF in
       NC3)
-        netcdf_compile_message
-        echo "$mode: NETCDF v 3 is no longer supported"; echo ' '
-        return 1
+        if [ -z "$NETCDF_LIBDIR" ]
+        then
+          netcdf_compile_message
+          echo "$mode: NETCDF_LIBDIR not defined"; echo ' '
+          return 1
+        fi
+        if [ -z "$NETCDF_INCDIR" ]
+        then
+          netcdf_compile_message
+          echo "$mode: NETCDF_INCDIR not defined"; echo ' '
+          return 1
+        fi
       ;;
       NC4)
+        if [ ! -n "`grep NC4 $switch_file`" ]
+        then
+          echo "WARNING: NC4 is set in WWATCH3_NETCDF but not in the switch file"; echo ' '
+#          return 1
+        fi
         if [ -z "$NETCDF_CONFIG" ]
         then
           netcdf_compile_message
@@ -353,7 +389,7 @@ EOF
         then
           netcdf_version="$netcdf_version.0"
         fi
-        if [ `echo $netcdf_version | tr -d . | tr -d - | tr -d 'A-Z a-z'` -lt 411 ]
+        if [ `echo $netcdf_version | tr -d .` -lt 411 ]
         then
           netcdf_compile_message
           echo "$mode: NetCDF version $netcdf_version < 4.1.1"; echo ' '
@@ -371,6 +407,34 @@ EOF
   return 0
   }
 
+# 1.c.3 NetCDF check api function
+
+  netcdf_check_api () {
+
+  mode=$1 #must be ERROR or WARNING
+
+  if [ -n "`grep NC4 $switch_file`" ]
+  then
+    case $WWATCH3_NETCDF in
+      NC3)
+        netcdf_compile_message
+        echo "$mode: WWATCH3_NETCDF=NC3 incompatible with NC4 switch"; echo ' '
+        return 1
+      ;;
+      NC4)
+        if [ "`$NETCDF_CONFIG --has-nc4`" = 'no' ]
+        then
+          netcdf_compile_message
+          echo "$mode: NetCDF-4 API not enabled (required by NC4 switch)"; echo ' '
+          return 1
+        fi
+      ;;
+    esac
+  fi
+
+  return 0
+  }
+
 # 1.c.4 Check for NetCDF compile
 
   if [ $default_mode -eq 1 ]
@@ -379,6 +443,11 @@ EOF
     then
       echo "NetCDF enabled programs ($cdf_programs)"
       echo "will not be compiled unless NetCDF compile environment is properly set."; echo ' '
+      if [ $systrck_nc4notrknc -eq 1 ] 
+      then 
+         echo "WARNING: ww3_systrk will not be compiled due to invalid switch option."; echo ' '
+         echo "TRKNC switch is also required with NC4."; echo ' '
+      fi 
       echo "Continuing with compile of non-NetCDF programs ..."; echo ' '
       progs="$reg_programs"
     fi
@@ -401,6 +470,20 @@ EOF
         exit 1
       fi
     fi
+    systrkprog="ww3_systrk"
+    for prog in $systrkprog
+    do
+      if [ -n "`echo $progs | grep $prog`" ]
+      then   
+        if [ $systrck_nc4notrknc -eq 1 ]
+        then
+          echo "ERROR: ww3_systrk will not be compiled due to invalid switch option."; echo ' '
+          echo "TRKNC switch is also required with NC4."; echo ' '
+          echo "Now exiting ..."; echo ' '
+          exit 1
+        fi
+      fi
+    done
   fi
 
 # 1.d Prepare scratch directory  - - - - - - - - - - - - - - - - - - - - - - - 
@@ -444,8 +527,14 @@ EOF
     then
       if [ "$flag_SHRD" -gt '0' ]
       then
-        cp $switch_file ${switch_file_old}_SEQ
-        cp $makefile ${makefile}_SEQ
+        if [ "$flag_OMPX" -gt '0' ]
+        then
+          cp $switch_file ${switch_file_old}_OMP
+          cp $makefile ${makefile}_OMP
+        else
+          cp $switch_file ${switch_file_old}_SEQ
+          cp $makefile ${makefile}_SEQ
+        fi
       else
         if [ "$flag_OMPH" -gt '0' ]
         then

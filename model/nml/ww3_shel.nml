@@ -46,8 +46,6 @@
 !     INPUT%FORCING%WATER_LEVELS  = 'F'
 !     INPUT%FORCING%CURRENTS      = 'F'
 !     INPUT%FORCING%WINDS         = 'F'
-!     INPUT%FORCING%ATM_MOMENTUM  = 'F'
-!     INPUT%FORCING%AIR_DENSITY   = 'F'
 !     INPUT%FORCING%ICE_CONC      = 'F'
 !     INPUT%FORCING%ICE_PARAM1    = 'F'
 !     INPUT%FORCING%ICE_PARAM2    = 'F'
@@ -126,7 +124,6 @@
 !  T  T  2    15   HMAXD      SDMH  St Dev of MXC (STE)
 !  T  T  2    16   HCMAXD     SDMHC St Dev of MXHC (STE)
 !  F  T  2    17   WBT        WBT   Dominant wave breaking probability bT
-!  F  F  2    18   FP0        TP    Peak period (from peak freq)
 !   -------------------------------------------------
 !        3                          Spectral Parameters (first 5)
 !   -------------------------------------------------

@@ -6,14 +6,13 @@
 !/                  | WAVEWATCH III           NOAA/NCEP |
 !/                  |           A. Thevenin             |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         22-Mar-2021 |
 !/                  +-----------------------------------+
+!/                  | Last update :         25-Sep-2020 |
 !/
 !/      July-2013 : Origination.                         ( version 4.18 )
 !/                    For upgrades see subroutines.
 !/     April-2016 : Add comments (J. Pianezze)           ( version 5.07 )
 !/    25-Sep-2020 : Coupling at T+0 support              ( version 7.10 )
-!/    22-Mar-2021 : Adds extra coupling fields           ( version 7.xx )
 !/
 !/    Copyright 2009-2012 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -198,7 +197,7 @@
       USE CONSTANTS, ONLY: RADIUS, DERA
       USE W3GDATMD,  ONLY: NX, NY, FLAGLL, XGRD, YGRD, MAPSTA, &
                            & HPFAC, HQFAC, GTYPE, &
-                           & UNGTYPE, RLGTYPE, CLGTYPE, SMCTYPE
+                           & UNGTYPE, RLGTYPE, CLGTYPE
 !/SMC      USE W3GDATMD,  ONLY: NSEA, X0, Y0, MRFct, SX, SY, IJKCel
 !/MPI      INCLUDE "mpif.h"
 !
@@ -216,11 +215,13 @@
       REAL, ALLOCATABLE    :: LON(:,:),LAT(:,:),AREA(:,:),      &
                               CORLON(:,:,:),CORLAT(:,:,:)
       REAL                 :: FACTOR
+      LOGICAL              :: RGLGRD = .TRUE.
 !/SMC      REAL                 :: DLON, DLAT
 !/ ------------------------------------------------------------------- /
 !
       IF (LD_MASTER) THEN
 !
+!/SMC         RGLGRD = .FALSE.
          !
          ! 0. Create grids file
          ! --------------------------------
@@ -230,6 +231,7 @@
          ! -------------------------------------------
          IF (GTYPE .EQ. RLGTYPE .OR. GTYPE .EQ. CLGTYPE) THEN
 !
+           IF (RGLGRD) THEN
              IF (FLAGLL) THEN
                FACTOR = 1.
              ELSE
@@ -287,7 +289,7 @@
                  END IF
                END DO
              END DO
-!/SMC        ELSE IF( GTYPE .EQ. SMCTYPE ) THEN
+!/SMC           ELSE
 !/SMC             !
 !/SMC             ! 1.2. SMC grids
 !/SMC             ! ----------------------------------
@@ -318,7 +320,7 @@
 !/SMC               ! Model grid mask
 !/SMC               MASK(I,1) = 1
 !/SMC             ENDDO
-!
+           ENDIF
          ELSE
             !
             ! 1.3. Unstructured grids
@@ -404,7 +406,7 @@
 !/ ------------------------------------------------------------------- /
 !
       USE W3GDATMD, ONLY: NSEAL,NSEA, NX, NY, MAPSTA, MAPSF, GTYPE, &
-                        & UNGTYPE, RLGTYPE, CLGTYPE, SMCTYPE
+                        & UNGTYPE, RLGTYPE, CLGTYPE
       USE W3ODATMD, ONLY: NAPROC, IAPROC
       USE W3PARALL, ONLY : INIT_GET_ISEA
 !
@@ -425,12 +427,15 @@
       INTEGER                 :: ISEA, JSEA, IX, IY
       INTEGER                 :: NHXW, NHXE, NHYS, NHYN  ! size of the halo at the western, eastern, southern, northern boundaries
       LOGICAL                 :: LL_MPI_FILE     ! to check if there an mpi.txt file for domain decompasition
+      LOGICAL                 :: RGLGRD = .TRUE.
 !/
 !/ ------------------------------------------------------------------- /
 !/ Executable part
 !/
+!/SMC      RGLGRD = .FALSE.
 !
       IF (GTYPE .EQ. RLGTYPE .OR. GTYPE .EQ. CLGTYPE) THEN 
+        IF (RGLGRD) THEN
           !
           ! 1.1. regular and curvilinear grids
           ! ----------------------------------
@@ -456,7 +461,7 @@
              ILA_PARAL(JSEA*2+1) = (IY - NHYN -1)*(NX - NHXE - NHXW) + (IX - NHXW - 1)
              ILA_PARAL(JSEA*2+2) = 1
           END DO
-!/SMC        ELSE IF( GTYPE .EQ. SMCTYPE ) THEN
+!/SMC        ELSE
 !/SMC          !
 !/SMC          ! 1.2. SMC grids
 !/SMC          ! ----------------------------------
@@ -471,7 +476,8 @@
 !/SMC          DO JSEA=1, NSEAL
 !/SMC            ILA_PARAL(JSEA+2) = IAPROC + (JSEA-1)*NAPROC
 !/SMC          ENDDO
-!
+        ENDIF
+        !
       ELSE
          !
          ! 1.3. Unstructured grids
@@ -741,14 +747,13 @@
 !/                  |           V. Garnier              |
 !/                  |           A.C. Bennis             |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         22-Mar-2021 |
+!/                  | Last update :          April-2016 |
 !/                  +-----------------------------------+
 !/
 !/    Jul-2013 : Origination.                               ( version 4.18 )
 !/    Mar-2014 : J. Pianezze (LPO) : Add atmospheric fields ( version 5.07 )
 !/    Apr-2015 : M. Accensi  (LPO) : Add fields selection   ( version 5.07 )
 !/    Apr-2016 : Add comments (J. Pianezze)                 ( version 5.07 )
-!/ 22-Mar-2021 : Adds extra coupling fields                 ( version 7.xx )
 !/
 !  1. Purpose :
 !
@@ -864,20 +869,6 @@
 !/OASACM         ID_NB_RCV=ID_NB_RCV+1
 !/OASACM         RCV(ID_NB_RCV)%CL_FIELD_NAME='WW3__V10'
 !
-!/OASACM      CASE('TAU')
-!/OASACM         ! UTAUA : u-momentum (m2.s-2)
-!/OASACM         ID_NB_RCV=ID_NB_RCV+1
-!/OASACM         RCV(ID_NB_RCV)%CL_FIELD_NAME='WW3_UTAU'
-!
-!/OASACM         ! V10 : v-momentum speed (m2.s-2)
-!/OASACM         ID_NB_RCV=ID_NB_RCV+1
-!/OASACM         RCV(ID_NB_RCV)%CL_FIELD_NAME='WW3_VTAU'
-!
-!/OASACM      CASE('RHO')
-!/OASACM         ! rhoa : air density (kg.m-3)
-!/OASACM         ID_NB_RCV=ID_NB_RCV+1
-!/OASACM         RCV(ID_NB_RCV)%CL_FIELD_NAME='WW3_RHOA'
-!
 
 !
 ! ICE MODEL VARIABLES
@@ -897,7 +888,11 @@
 !/OASICM         ID_NB_RCV=ID_NB_RCV+1
 !/OASICM         RCV(ID_NB_RCV)%CL_FIELD_NAME='WW3__ICE'
 !
-
+!/OASICM      CASE('IC3')
+!/OASICM         ! ICEF : ice floe average diameter (m)
+!/OASICM         ID_NB_RCV=ID_NB_RCV+1
+!/OASICM         RCV(ID_NB_RCV)%CL_FIELD_NAME='WW3__IC3'
+!
          CASE DEFAULT
             WRITE (NDSO,1001) TRIM(TESTSTR(1:6))
          END SELECT
@@ -928,15 +923,10 @@
 !/OASOCM            ID_NB_SND = ID_NB_SND +1
 !/OASOCM            SND(ID_NB_SND)%CL_FIELD_NAME='WW3_ODRY'
 !
-!/OASOCM         CASE('T0M1')
-!/OASOCM            ! T0M1 / wave_t0m1 : mean period (s)
+!/OASOCM         CASE('TM10')
+!/OASOCM            ! TM10 / wave_tm10 : mean period (s)
 !/OASOCM            ID_NB_SND = ID_NB_SND +1
-!/OASOCM            SND(ID_NB_SND)%CL_FIELD_NAME='WW3_T0M1'
-!
-!/OASOCM         CASE('T01')
-!/OASOCM            ! T01 / wave_t01 : mean period (s)
-!/OASOCM            ID_NB_SND = ID_NB_SND +1
-!/OASOCM            SND(ID_NB_SND)%CL_FIELD_NAME='WW3__T01'
+!/OASOCM            SND(ID_NB_SND)%CL_FIELD_NAME='WW3_TM10'
 !
 !/OASOCM         CASE('DIR')
 !/OASOCM            ! THM / wave_thm : cosinus of mean direction (n/a)
@@ -960,15 +950,6 @@
 !/OASOCM            ! tauoy / wave_tauoy : y-component of the wave-ocean momentum flux (tauox in m2.s-2)
 !/OASOCM            ID_NB_SND = ID_NB_SND +1
 !/OASOCM            SND(ID_NB_SND)%CL_FIELD_NAME='WW3_TWOY'
-!
-!/OASOCM         CASE('TOC')
-!/OASOCM            ! tauocx / wave_tauocx : x-component of the total wave-ocean momentum flux (tauocx in m2.s-2)
-!/OASOCM            ID_NB_SND = ID_NB_SND +1
-!/OASOCM            SND(ID_NB_SND)%CL_FIELD_NAME='WW3_TOCX'
-!
-!/OASOCM            ! tauocy / wave_tauocy : y-component of the total wave-ocean momentum flux (tauocx in m2.s-2)
-!/OASOCM            ID_NB_SND = ID_NB_SND +1
-!/OASOCM            SND(ID_NB_SND)%CL_FIELD_NAME='WW3_TOCY'
 !
 !/OASOCM         CASE('FOC')
 !/OASOCM            ! phioc / wave_phioc : Wave-to-ocean TKE flux (phioc in W.m-2)
@@ -1011,11 +992,6 @@
 !/OASOCM            ! wlm / wave_wlm : mean length wave (m)
 !/OASOCM            ID_NB_SND = ID_NB_SND +1
 !/OASOCM            SND(ID_NB_SND)%CL_FIELD_NAME='WW3___LM'
-!
-!/OASOCM         CASE('WNM')
-!/OASOCM            ! wnmean / wave_wnmean : mean wave number (m-1)
-!/OASOCM            ID_NB_SND = ID_NB_SND +1
-!/OASOCM            SND(ID_NB_SND)%CL_FIELD_NAME='WW3__WNM'
 !
 !/OASOCM         CASE('TUS')
 !/OASOCM            ! Volume transport associated to Stokes drift, u component (m2.s-1)

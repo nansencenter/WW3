@@ -242,7 +242,7 @@
       INTEGER                 :: IX1, IY1, IXS, IYS
 !/S      INTEGER, SAVE           :: IENT = 0
 !/O7a      INTEGER                 :: IX0, IXN, IY0, IYN, NNX,         &
-!/O7a                                 KX, KY, JX, IIX, IX2, IY2, IS1
+!/O7a                                 KX, KY, JX, IIX
       INTEGER                 :: IX(4), IY(4)   ! Indices of points used in interp.
       REAL                    :: RD(4)          ! Interpolation coefficient 
 !/O7a      REAL                    :: RD1, RD2, RDTOT, ZBOX(4), DEPTH
@@ -392,7 +392,7 @@
 !/O7a                         RD(4)*ZBOX(4) ) / RDTOT
 !/O7a            WRITE (SCREEN,943) DEPTH
 !
-!/O7a      ! *** implementation of O7a option with curvilinear grids is incomplete ***
+!/O7a       *** implementation of O7a option with curvilinear grids is incomplete ***
 !
 !/O7a            IF ( RD1 .LT. 0.05 ) IX2 = IX1
 !/O7a            IF ( RD1 .GT. 0.95 ) IX1 = IX2
@@ -619,12 +619,12 @@
 !/RTD !!   Use spectral rotation sub and angle.  JGLi12Jun2012
 !/RTD      USE W3GDATMD, ONLY: NSPEC, AnglD, FLAGUNR 
 !/RTD      USE W3SERVMD, ONLY: W3ACTURN
-      USE W3WDATMD, ONLY: ICE, ICEH, ICEF 
+      USE W3WDATMD, ONLY: ICE, ICEH, ICEF, ICEDAVE 
       USE W3ADATMD, ONLY: CG, DW, UA, UD, AS, CX, CY,                 &
                           SP => SPPNT
       USE W3ODATMD, ONLY: NDST, NOPTS, IPTINT, PTIFAC, IL, IW, II,    &
                           DPO, WAO, WDO, ASO, CAO, CDO, ICEO, ICEHO,  &
-                          ICEFO, SPCO, NAPROC
+                          ICEFO, ICEDAVEO, SPCO, NAPROC
 !/SETUP      USE W3WDATMD, ONLY: ZETA_SETUP
 !/SETUP      USE W3ODATMD, ONLY: ZET_SETO
 !/MPI      USE W3ODATMD, ONLY: IRQPO2
@@ -718,15 +718,20 @@
 !
         IF (.NOT. LPDLIB) THEN
           ICEFO(I) = 0
+          ICEDAVEO(I) = 0
           DO J=1, 4
             ISEA = MAPFS(IY(J),IX(J))
 !/DIST          JSEA = 1 + (ISEA-1)/NAPROC
 !/SHRD          JSEA = ISEA
             ICEFO(I) = ICEFO(I) + RD(J)*ICEF(JSEA)
+            ICEDAVEO(I) = ICEDAVEO(I) + RD(J)*ICEDAVE(JSEA)
           END DO
         ELSE
           ICEFO(I) = RD(1)*ICEF(IS(1)) + RD(2)*ICEF(IS(2)) +          &
                    RD(3)*ICEF(IS(3)) + RD(4)*ICEF(IS(4))
+          ICEDAVEO(I) = RD(1)*ICEDAVE(IS(1)) + RD(2)*ICEDAVE(IS(2)) +          &
+                   RD(3)*ICEDAVE(IS(3)) + RD(4)*ICEDAVE(IS(4))
+
         END IF
 
         ICEO(I) = RD(1)*ICE(IS(1)) + RD(2)*ICE(IS(2)) +               &
@@ -940,7 +945,7 @@
       USE W3ODATMD, ONLY: NDST, NDSE, IPASS => IPASS2, NOPTS, IPTINT, &
                           IL, IW, II, PTLOC, PTIFAC, DPO, WAO, WDO,   &
                           ASO, CAO, CDO, SPCO, PTNME, O2INIT, FNMPRE, &
-                          GRDID, ICEO, ICEHO, ICEFO
+                          GRDID, ICEO, ICEHO, ICEFO, ICEDAVEO
       USE W3ODATMD, ONLY :  OFILES
 !/
 !/SETUP      USE W3ODATMD, ONLY: ZET_SETO
@@ -1168,13 +1173,15 @@
                     IW(I), II(I), IL(I), DPO(I), WAO(I), WDO(I),      &
 !/SETUP             ZET_SETO(I),                                      &
                     ASO(I), CAO(I), CDO(I), ICEO(I), ICEHO(I),        &
-                    ICEFO(I), GRDID(I), (SPCO(J,I),J=1,NSPEC)
+                    ICEFO(I), ICEDAVEO(I), GRDID(I),                  &
+                    (SPCO(J,I),J=1,NSPEC)
           ELSE
              READ (NDSOP,END=801,ERR=802,IOSTAT=IERR)                 &
                     IW(I), II(I), IL(I), DPO(I), WAO(I), WDO(I),      &
 !/SETUP             ZET_SETO(I),                                      &
                     ASO(I), CAO(I), CDO(I), ICEO(I), ICEHO(I),        &
-                    ICEFO(I), GRDID(I), (SPCO(J,I),J=1,NSPEC)
+                    ICEFO(I), ICEDAVEO(I), GRDID(I),                  &
+                    (SPCO(J,I),J=1,NSPEC)
           END IF
 !
         END DO

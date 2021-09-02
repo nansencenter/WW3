@@ -35,11 +35,9 @@ ifeq ($(WW3_COMP),Portland)
 else ifeq ("$(WW3_COMP)",$(filter "$(WW3_COMP)","pgi" "datarmor_pgi" "datarmor_pgi_debug"))
  ESMF_F90COMPILEOPTS := $(ESMF_F90COMPILEOPTS) -byteswapio
 # intel
-else ifeq ("$(WW3_COMP)",$(filter "$(WW3_COMP)","Intel" "hera.intel" "orion.intel" "jet.intel")) 
+else ifeq ("$(WW3_COMP)",$(filter "$(WW3_COMP)","Intel" "hera" "orion" "cheyenne" "stampede"))
  ESMF_F90COMPILEOPTS := $(ESMF_F90COMPILEOPTS) -convert big_endian
-else ifeq ("$(WW3_COMP)",$(filter "$(WW3_COMP)", "cheyenne.intel" "stampede.intel"))
- ESMF_F90COMPILEOPTS := $(ESMF_F90COMPILEOPTS) -convert big_endian
-else ifeq ("$(WW3_COMP)",$(filter "$(WW3_COMP)","wcoss_cray" "wcoss_dell_p3" "gaea.intel" "wcoss2"))
+else ifeq ("$(WW3_COMP)",$(filter "$(WW3_COMP)","wcoss_cray" "wcoss_dell_p3"))
  ESMF_F90COMPILEOPTS := $(ESMF_F90COMPILEOPTS) -convert big_endian
 else ifeq ("$(WW3_COMP)",$(filter "$(WW3_COMP)","intel" "datarmor_intel" "datarmor_intel_debug"))
  ESMF_F90COMPILEOPTS := $(ESMF_F90COMPILEOPTS) -convert big_endian
@@ -48,8 +46,6 @@ else ifeq ("$(WW3_COMP)",$(filter "$(WW3_COMP)","mpt" "datarmor_mpt" "datarmor_m
  ESMF_F90COMPILEOPTS := $(ESMF_F90COMPILEOPTS) -convert big_endian
 # gnu
 else ifeq ("$(WW3_COMP)",$(filter "$(WW3_COMP)","gnu" "datarmor_gnu" "datarmor_gnu_debug"))
- ESMF_F90COMPILEOPTS := $(ESMF_F90COMPILEOPTS) -fconvert=big-endian
-else ifeq ("$(WW3_COMP)",$(filter "$(WW3_COMP)","hera.gnu" "cheyenne.gnu"))
  ESMF_F90COMPILEOPTS := $(ESMF_F90COMPILEOPTS) -fconvert=big-endian
 # error
 else
@@ -62,8 +58,8 @@ DEP_FRONTS    := -DFRONT_ESM=ESM
 DEP_FRONTS    += -DFRONT_ATM=MDL
 DEP_FRONTS    += -DFRONT_OCN=MDL
 DEP_FRONTS    += -DFRONT_ICE=MDL
-DEP_CMPL_OBJS := utl.o concomp.o mdl.o dum.o
-DEP_LINK_OBJS := esm.o utl.o concomp.o mdl.o dum.o
+DEP_CMPL_OBJS := utl.o con.o mdl.o dum.o
+DEP_LINK_OBJS := esm.o utl.o con.o mdl.o dum.o
 
 ifeq ($(MAKECMDGOALS),ww3_multi_esmf)
 include $(WW3_DIR)/nuopc.mk
@@ -106,7 +102,7 @@ ww3_multi_esmf: esmApp.o $(DEP_LINK_OBJS)
 esmApp.o: macros.h utl.o esm.o
 esm.o: macros.h $(DEP_CMPL_OBJS)
 utl.o: macros.h
-concomp.o: macros.h utl.o
+con.o: macros.h utl.o
 mdl.o: macros.h utl.o
 dum.o: macros.h
 

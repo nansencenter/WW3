@@ -6,7 +6,7 @@
 !/                  | WAVEWATCH III           NOAA/NCEP |
 !/                  |           H. L. Tolman            |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         22-Mar-2021 |
+!/                  | Last update :         13-Jan-2016 |
 !/                  +-----------------------------------+
 !/
 !/    21-Jan-2000 : Origination.                        ( version 2.00 )
@@ -56,8 +56,6 @@
 !/    26-Mar-2018 : Sea-point only Wnd/Cur input.  JGLi ( version 6.04 )
 !/    07-Oct-2019 : RTD option with standard lat-lon
 !/                  grid when nesting to rotated grid   ( version 7.11 )
-!/    22-Mar-2021 : Add W3UTAU, W3URHO routines         ( version 7.xx )
-!/    06-May-2021 : Use ARCTC option for SMC grid. JGLi ( version 7.xx )
 !/
 !/    Copyright 2009-2014 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -76,12 +74,10 @@
 !     ----------------------------------------------------------------
 !      W3UCUR    Subr. Public   Update current fields.
 !      W3UWND    Subr. Public   Update wind fields.
-!      W3UTAU    Subr. Public   Update atmospheric momentum fields.
 !      W3UINI    Subr. Public   Update initial conditions.
 !      W3UBPT    Subr. Public   Update boundary conditions.
 !      W3UICE    Subr. Public   Update ice concentrations.
 !      W3ULEV    Subr. Public   Update water levels.
-!      W3URHO    Subr. Public   Update air density.
 !      W3UTRN    Subr. Public   Update cell boundary transparancies.
 !      W3DZXY    Subr. Public   Calculate derivatives of a field.
 !     ----------------------------------------------------------------
@@ -110,9 +106,9 @@
 !       !/CRT1   Linear current interpolation.
 !       !/CRT2   Quasi-quadratic current interpolation.
 !
-!       !/WNT0   No wind/momentum interpolation.
-!       !/WNT1   Linear wind/momentum interpolation.
-!       !/WNT2   Energy conservation in wind/momentum interpolation.
+!       !/WNT0   No wind interpolation.
+!       !/WNT1   Linear wind interpolation.
+!       !/WNT2   Energy conservation in wind interpolation.
 !
 !       !/RWND   Use wind speeds relative to currents.
 !
@@ -211,8 +207,8 @@
 !
 !/ ------------------------------------------------------------------- /
       USE W3GDATMD, ONLY: NX, NY, NSEA, MAPSF
-!/SMC      USE W3GDATMD, ONLY: NARC, NGLO, ANGARC 
-!/SMC      USE W3GDATMD, ONLY: FSWND, ARCTC 
+!/ARC      USE W3GDATMD, ONLY: NARC, NGLO, ANGARC 
+!/SMC      USE W3GDATMD, ONLY: FSWND 
       USE W3WDATMD, ONLY: TIME
       USE W3ADATMD, ONLY: CX, CY, CA0, CAI, CD0, CDI
       USE W3IDATMD, ONLY: TC0, CX0, CY0, TCN, CXN, CYN
@@ -371,11 +367,11 @@
 !/CRT2        CABS    = CABS * MIN( 1.25 , CI2/MAX(1.E-7,CABS) )
         CDIR    = CD0(ISEA) + RD * CDI(ISEA)
 
-!/SMC  !Li   Rotate curreent direction by ANGARC for Arctic part cells.  JGLi23Mar2016
-!/SMC        IF( ARCTC .AND. (ISEA .GT. NGLO) ) THEN
-!/SMC            DN = CDIR + ANGARC( ISEA - NGLO )*DERA
-!/SMC            CDIR = MOD ( TPI + DN, TPI )
-!/SMC        ENDIF
+!/ARC  !Li   Rotate curreent direction by ANGARC for Arctic part cells.  JGLi23Mar2016
+!/ARC        IF( ISEA .GT. NGLO ) THEN
+!/ARC            DN = CDIR + ANGARC( ISEA - NGLO )*DERA
+!/ARC            CDIR = MOD ( TPI + DN, TPI )
+!/ARC        ENDIF
 
         CX(ISEA) = CABS * COS(CDIR)
         CY(ISEA) = CABS * SIN(CDIR)
@@ -487,7 +483,8 @@
 !/WCOR      USE W3GDATMD, ONLY:   WWCOR
 !/RWND      USE W3GDATMD, ONLY:   RWINDC
 !/ST2      USE W3GDATMD, ONLY: ZWIND, OFSTAB, FFNG, FFPS, CCNG, CCPS, SHSTAB
-!/SMC      USE W3GDATMD, ONLY: NARC, NGLO, ANGARC, ARCTC, FSWND 
+!/ARC      USE W3GDATMD, ONLY: NARC, NGLO, ANGARC 
+!/SMC      USE W3GDATMD, ONLY: FSWND 
       USE W3WDATMD, ONLY: TIME, ASF
       USE W3ADATMD, ONLY: DW, CX, CY, UA, UD, U10, U10D, AS,          &
                           UA0, UAI, UD0, UDI, AS0, ASI
@@ -583,11 +580,11 @@
 !/MGW        UYR        = UA(ISEA)*SIN(UD(ISEA)) + VGY
 !/MGW        UA(ISEA) = MAX ( 0.001 , SQRT(UXR**2+UYR**2) )
 !/MGW        UD(ISEA) = MOD ( TPI+ATAN2(UYR,UXR) , TPI )
-!/SMC  !Li   Rotate wind direction by ANGARC for Arctic part cells.
-!/SMC        IF( ARCTC .AND. (ISEA .GT. NGLO) ) THEN
-!/SMC            UDARC = UD(ISEA) + ANGARC( ISEA - NGLO )*DERA
-!/SMC            UD(ISEA) = MOD ( TPI + UDARC, TPI )
-!/SMC        ENDIF
+!/ARC  !Li   Rotate wind direction by ANGARC for Arctic part cells.
+!/ARC        IF( ISEA .GT. NGLO ) THEN
+!/ARC            UDARC = UD(ISEA) + ANGARC( ISEA - NGLO )*DERA
+!/ARC            UD(ISEA) = MOD ( TPI + UDARC, TPI )
+!/ARC        ENDIF
 !
         AS(ISEA) = AS0(ISEA) + RD * ASI(ISEA)
 !        IF (UA(ISEA).NE.UA(ISEA)) WRITE(6,*) 'BUG WIND:',ISEA,UA(ISEA),MAPSF(ISEA,1), MAPSF(ISEA,2),UA0(ISEA),RD,UAI(ISEA)
@@ -659,182 +656,6 @@
 !/ End of W3UWND ----------------------------------------------------- /
 !/
       END SUBROUTINE W3UWND
-!/ ------------------------------------------------------------------- /
-      SUBROUTINE W3UTAU ( FLFRST )
-!/
-!/                  +-----------------------------------+
-!/                  | WAVEWATCH III           NOAA/NCEP |
-!/                  |           J. M. Castillo          |
-!/                  |                        FORTRAN 90 |
-!/                  | Last update :         22-Mar-2021 |
-!/                  +-----------------------------------+
-!/
-!/    22-Mar-2021 : First implementation                ( version 7.xx )
-!/
-!  1. Purpose :
-!
-!     Interpolate atmosphere momentum fields to the given time.
-!
-!  2. Method :
-!
-!     Linear interpolation of momentum module and direction, with a simple
-!     correction to obtain quasi-conservation of energy.
-!
-!  3. Parameters :
-!
-!     Parameter list
-!     ----------------------------------------------------------------
-!       FLFRST  Log.  I   Flag for first pass through routine.
-!     ----------------------------------------------------------------
-!
-!  4. Subroutines used :
-!
-!     See module documentation.
-!
-!  5. Called by :
-!
-!      Name      Type  Module   Description
-!     ----------------------------------------------------------------
-!      W3WAVE    Subr. W3WAVEMD Actual wave model routine.
-!     ----------------------------------------------------------------
-!
-!  6. Error messages :
-!
-!       None.
-!
-!  7. Remarks :
-!
-!     - Only momentum over sea points is considered.
-!     - Time ranges checked in W3WAVE.
-!
-!  8. Structure :
-!
-!     --------------------------------------
-!      1.  Prepare auxiliary arrays.
-!      2.  Calculate interpolation factors
-!      3.  Get actual momentum
-!     --------------------------------------
-!
-!  9. Switches :
-!
-!     !/OMPG   OpenMP compiler directives.
-!
-!     !/WNT0   No momentum interpolation.
-!     !/WNT1   Linear momentum interpolation.
-!     !/WNT2   Energy conservation in momentum interpolation.
-!
-!     !/S      Enable subroutine tracing.
-!     !/T      Test output.
-!
-! 10. Source code :
-!
-!/ ------------------------------------------------------------------- /
-      USE W3GDATMD, ONLY: NSEA, MAPSF
-!/SMC      USE W3GDATMD, ONLY: NARC, NGLO, ANGARC 
-!/SMC      USE W3GDATMD, ONLY: FSWND, ARCTC  
-      USE W3WDATMD, ONLY: TIME
-      USE W3ADATMD, ONLY: TAUA, TAUADIR, MA0, MAI, MD0, MDI
-      USE W3IDATMD, ONLY: TU0, UX0, UY0, TUN, UXN, UYN
-!/
-      IMPLICIT NONE
-!/
-!/ ------------------------------------------------------------------- /
-!/ Parameter list
-!/
-      LOGICAL, INTENT(IN)     :: FLFRST
-!/
-!/ ------------------------------------------------------------------- /
-!/
-      INTEGER                 :: ISEA, IX, IY
-!/S      INTEGER, SAVE           :: IENT = 0
-      REAL                    :: D0, DN, DD, DT0N, DT0T, RD, MI2,      &
-                                 MXR, MYR
-!/WNT2      REAL                    :: RD2
-      REAL                    :: MDARC
-!/
-!/ ------------------------------------------------------------------- /
-!/
-!/S      CALL STRACE (IENT, 'W3UTAU')
-!
-! 1.  Prepare auxiliary arrays
-!
-      IF ( FLFRST ) THEN
-          DO ISEA=1, NSEA
-!/SMC !!Li  For sea-point only SMC grid momentum 1-D momentum is stored on
-!/SMC !!Li  2-D UX0(NSEA, 1) variable.
-!/SMC        IF( FSWND ) THEN
-!/SMC            IX = ISEA 
-!/SMC            IY = 1
-!/SMC        ELSE
-            IX        = MAPSF(ISEA,1)
-            IY        = MAPSF(ISEA,2)
-!/SMC        ENDIF
-
-            MA0(ISEA) = SQRT ( UX0(IX,IY)**2 + UY0(IX,IY)**2 )
-            MAI(ISEA) = SQRT ( UXN(IX,IY)**2 + UYN(IX,IY)**2 )
-            IF ( MA0(ISEA) .GT. 1.E-7) THEN
-                D0     = MOD ( TPI+ATAN2(UY0(IX,IY),UX0(IX,IY)) , TPI )
-              ELSE
-                D0     = 0
-              END IF
-            IF ( MAI(ISEA) .GT. 1.E-7) THEN
-                DN     = MOD ( TPI+ATAN2(UYN(IX,IY),UXN(IX,IY)) , TPI )
-              ELSE
-                DN     = D0
-              END IF
-            IF ( MA0(ISEA) .GT. 1.E-7) THEN
-                MD0(ISEA) = D0
-              ELSE
-                MD0(ISEA) = DN
-              END IF
-            DD     = DN - MD0(ISEA)
-            IF (ABS(DD).GT.PI) DD = DD - TPI*SIGN(1.,DD)
-            MDI(ISEA) = DD
-            MAI(ISEA) = MAI(ISEA) - MA0(ISEA)
-            END DO
-        END IF
-!
-! 2.  Calculate interpolation factor
-!
-      DT0N    = DSEC21 ( TU0, TUN )
-      DT0T   = DSEC21 ( TU0, TIME )
-!
-!/WNT0      RD     = 0.
-!/WNT1      RD     = DT0T / MAX ( 1.E-7 , DT0N )
-!/WNT2      RD     = DT0T / MAX ( 1.E-7 , DT0N )
-!/WNT2      RD2    =  1. - RD
-!/OASACM     RD     = 1.
-!
-!/T      WRITE (NDST,9000) DT0N, DT0T, RD
-!
-! 3.  Actual momentum for all grid points
-!
-!/OMPG/!$OMP PARALLEL DO PRIVATE (ISEA,MI2,MXR,MYR,MDARC)
-!
-      DO ISEA=1, NSEA
-!
-        TAUA(ISEA) = MA0(ISEA) + RD * MAI(ISEA)
-!/WNT2        MI2      = SQRT ( RD2 *      MA0(ISEA)**2 +             &
-!/WNT2                          RD  *(MA0(ISEA)+MAI(ISEA))**2 )
-!/WNT2        TAUA(ISEA) = TAUA(ISEA) * MIN(1.25,MI2/MAX(1.E-7,TAUA(ISEA)))
-        TAUADIR(ISEA) = MD0(ISEA) + RD * MDI(ISEA)
-!/SMC  !Li   Rotate momentum direction by ANGARC for Arctic part cells.
-!/SMC        IF( ARCTC .AND. (ISEA .GT. NGLO) ) THEN
-!/SMC            MDARC = TAUADIR(ISEA) + ANGARC( ISEA - NGLO )*DERA
-!/SMC            TAUADIR(ISEA) = MOD ( TPI + MDARC, TPI )
-!/SMC        ENDIF
-!
-        END DO
-!
-      RETURN
-!
-! Formats
-!
-!/T 9000 FORMAT (' TEST W3UTAU : DT0N, DT0T, RD :',2F8.1,F6.3)
-!/
-!/ End of W3UTAU ----------------------------------------------------- /
-!/
-      END SUBROUTINE W3UTAU
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3UINI ( A )
 !/
@@ -1307,8 +1128,8 @@
 ! 10. Source code :
 !
 !/ ------------------------------------------------------------------- /   
-      USE W3GDATMD, ONLY: NSEA, NSEA, MAPSF, IICEHMIN, IICEHFAC
-      USE W3WDATMD, ONLY: TIME, TIC1, ICEH
+      USE W3GDATMD, ONLY: NSEA, NSEA, MAPSF, IICEHMIN, IICEHFAC, IICEVOL2H
+      USE W3WDATMD, ONLY: TIME, TIC1, ICEH, ICE
       USE W3IDATMD, ONLY: TI1, ICEP1, FLIC1
 !/
       IMPLICIT NONE
@@ -1336,7 +1157,20 @@
 !
         IX        = MAPSF(ISEA,1)
         IY        = MAPSF(ISEA,2)
-        ICEH(ISEA) = MAX(IICEHMIN,IICEHFAC*ICEP1(IX,IY))
+
+        IF (ICE(ISEA).GT.0.)  THEN
+          ! If conversion from sea ice volume (per surface area) to true ice thickness
+          ! Two additionals conditions avoid super high values for very low
+          ! concentrations
+          IF (IICEVOL2H.AND.(ICE(ISEA).GT.0.01)) THEN
+            ICEH(ISEA) = MAX(IICEHMIN,MIN( IICEHFAC*ICEP1(IX,IY)/ICE(ISEA),30.))
+          ELSE
+            ICEH(ISEA) = MAX(IICEHMIN,IICEHFAC*ICEP1(IX,IY))
+          ENDIF
+        ELSE 
+          ICEH(ISEA) = 0.
+        ENDIF
+
       END DO
 !
       RETURN
@@ -1457,6 +1291,113 @@
 !/ End of W3UIC5 ----------------------------------------------------- /
 !/
       END SUBROUTINE W3UIC5
+!/
+      SUBROUTINE W3UIC3( FLFRST )
+!/
+!/                  +-----------------------------------+
+!/                  | WAVEWATCH III           NOAA/NCEP |
+!/                  |  G. Boutin        |
+!/                  |                        FORTRAN 90 |
+!/                  | Last update :         30-Jan-2019 |
+!/                  +-----------------------------------+
+!/
+!/    30-Jan-2019 : Creation                            ( version 6.XX )   
+!/
+!  1. Purpose :
+!
+!     Update ice floe average diameter in the wave model.
+!
+!  2. Method :
+!
+!  3. Parameters :
+!
+!     Parameter list
+!     ----------------------------------------------------------------
+!      FLFRST   L.    I     Spectra in 1-D or 2-D representation
+!                           (points to same address).
+!     ----------------------------------------------------------------
+!
+!  4. Subroutines used :
+!
+!     See module documentation.
+!
+!  5. Called by :
+!
+!      Name      Type  Module   Description
+!     ----------------------------------------------------------------
+!      W3WAVE    Subr. W3WAVEMD Actual wave model routine.
+!     ----------------------------------------------------------------
+!
+!  6. Error messages :
+!
+!     None.
+!
+!  7. Remarks :
+!
+!  8. Structure :
+!
+!     See source code.
+!
+!  9. Switches :
+!
+!     !/SHRD  Switch for shared / distributed memory architecture.
+!     !/DIST  Id.
+!
+!     !/S  Enable subroutine tracing.
+!     !/T  Enable test output.
+!
+! 10. Source code :
+!
+!/ ------------------------------------------------------------------- /   
+      USE W3IDATMD, ONLY: TI3, ICEP3
+      USE W3GDATMD, ONLY: NSEA, MAPSF
+      USE W3WDATMD, ONLY: TIME, TIC3, ICE, ICEH, ICEDAVE
+!/
+      IMPLICIT NONE
+!/
+!/ ------------------------------------------------------------------- /
+!/ Parameter list
+      LOGICAL, INTENT(IN)     :: FLFRST
+!/    
+!/
+!/ ------------------------------------------------------------------- /
+!/ Local variables
+!/      
+      INTEGER                 :: IX, IY, ISEA
+      LOGICAL                 :: FLFLOE
+!/
+!/
+! 1.  Preparations --------------------------------------------------- *
+! 1.a Update times
+!
+!/T      WRITE (NDST,9010) TIME, TIC3, TI3
+      TIC3(1) = TI3(1)
+      TIC3(2) = TI3(2)
+
+! 2.  Main loop over sea points -------------------------------------- *
+
+      DO ISEA=1, NSEA 
+!
+        IX        = MAPSF(ISEA,1)
+        IY        = MAPSF(ISEA,2)
+        FLFLOE = ICE(ISEA) .EQ. 0 .OR. ICEH(ISEA) .EQ. 0
+        IF ( FLFLOE) THEN          
+          ICEDAVE(ISEA) = 0.0
+        ELSE
+          ICEDAVE(ISEA) = ICEP3(IX,IY)
+        END IF
+      END DO
+!
+      RETURN
+!/T 9010 FORMAT ( ' TEST W3UIC3 : TIME     :',I9.8,I7.6/              &
+!/T               '               OLD TICE :',I9.8,I7.6/              &
+!/T               '               NEW TICE :',I9.8,I7.6)
+
+!/
+!/
+!/ End of W3UIC3 ----------------------------------------------------- /
+!/
+      END SUBROUTINE W3UIC3
 !/ ------------------------------------------------------------------- /      
       
       SUBROUTINE W3UICE ( A, VA )
@@ -2151,104 +2092,6 @@
 !/ End of W3ULEV ----------------------------------------------------- /
 !/
       END SUBROUTINE W3ULEV
-!/ ------------------------------------------------------------------- /
-      SUBROUTINE W3URHO ( )
-!/
-!/                  +-----------------------------------+
-!/                  | WAVEWATCH III           NOAA/NCEP |
-!/                  |           J. M. Castillo          |
-!/                  |                        FORTRAN 90 |
-!/                  | Last update :         22-Mar-2021 |
-!/                  +-----------------------------------+
-!/
-!/    22-Mar-2021 : First implementation                ( version 7.xx )
-!/
-!  1. Purpose :
-!
-!     Update air density 
-!
-!  2. Method :
-!
-!     Conservative linear interpolation to new grid.
-!
-!  3. Parameters :
-!
-!     Parameter list
-!     ----------------------------------------------------------------
-!       None
-!     ----------------------------------------------------------------
-!
-!  4. Subroutines used :
-!
-!     See module documentation.
-!
-!  5. Called by :
-!
-!      Name      Type  Module   Description
-!     ----------------------------------------------------------------
-!      W3WAVE    Subr. W3WAVEMD Actual wave model routine.
-!     ----------------------------------------------------------------
-!
-!  6. Error messages :
-!
-!     None.
-!
-!  7. Remarks :
-!
-!  8. Structure :
-!
-!     See source code.
-!
-!  9. Switches :
-!
-!     !/SHRD  Switch for shared / distributed memory architecture.
-!     !/DIST  Id.
-!
-!     !/S  Enable subroutine tracing.
-!     !/T  Enable test output.
-!
-! 10. Source code :
-!
-!/ ------------------------------------------------------------------- /
-      USE W3GDATMD, ONLY: NSEA, MAPSF
-      USE W3WDATMD, ONLY: TIME, TRHO, RHOAIR
-      USE W3IDATMD, ONLY: TRN, RAIR
-!/
-      IMPLICIT NONE
-!/
-!/ ------------------------------------------------------------------- /
-!/ Parameter list
-!/
-!/ ------------------------------------------------------------------- /
-!/
-      INTEGER                 :: ISEA, IX, IY
-!/S      INTEGER, SAVE            :: IENT = 0
-!/
-!/ ------------------------------------------------------------------- /
-!/
-!/S      CALL STRACE (IENT, 'W3URHO')
-!
-! 1.  Update times --------------------------------------------------- *
-!
-      TRHO(1) = TRN(1)
-      TRHO(2) = TRN(2)
-!
-! 2.  Main loop over sea points -------------------------------------- *
-!
-      DO ISEA=1, NSEA
-        IX        = MAPSF(ISEA,1)
-        IY        = MAPSF(ISEA,2)
-        RHOAIR(ISEA) = RAIR(IX,IY)
-      END DO
-!
-      RETURN
-!
-! Formats
-!
-!/
-!/ End of W3URHO ----------------------------------------------------- /
-!/
-      END SUBROUTINE W3URHO
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3UTRN ( TRNX, TRNY )
 !/

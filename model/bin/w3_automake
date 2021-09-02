@@ -169,8 +169,15 @@
   if [ -n "$(grep TRKNC $switch_file)" ]
   then
     cdf_programs="$cdf_programs ww3_systrk"
+    systrck_nc4notrknc=0
   else
-    reg_programs="$reg_programs ww3_systrk"
+    if [ -n "$(grep NC4 $switch_file)" ]
+    then
+      systrck_nc4notrknc=1
+    else
+      systrck_nc4notrknc=0
+      reg_programs="$reg_programs ww3_systrk"
+    fi
   fi
 
   # SHEL PREP GSPL
@@ -239,7 +246,7 @@
         seq_progs="$seq_progs $prog"
       fi
       # add seq compilation of ww3_prnc if already compiled in par for TIDE
-      if [ "$(echo $prog)" == "ww3_prnc" ] && [ -n "$(grep TIDE $switch_file)" ]
+      if [ "$(echo $prog)" == "ww3_prnc" ] && [ -n "$(grep TIDE $switch_file)" ] && ! [ -n "$(grep OASIS $switch_file)" ]
       then
         seq_progs="$seq_progs ww3_prnc"
       fi
@@ -258,7 +265,7 @@
   then
     MODES="MPI"
   fi
-# "SHRD OMPG"
+# "SHRD OMPG OMPX"
   if [ ! -n "$(grep MPI $switch_file)" ] && [ -n "$(grep OMPG $switch_file)" ]
   then
     MODES="OMP"
@@ -301,6 +308,7 @@
         -e 's/OMPG //g'    \
         -e 's/PDLIB //g'    \
         -e 's/OMPH //g'    \
+        -e 's/OMPX //g'    \
         -e 's/MPI //g' switch > $main_dir/work_SEQ/switch.SEQ
   fi
   

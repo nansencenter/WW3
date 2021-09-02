@@ -7,7 +7,7 @@
 !/                  | WAVEWATCH III           NOAA/NCEP |
 !/                  |           H. L. Tolman            |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         22-Mar-2021 |
+!/                  | Last update :         06-Jun-2018 |
 !/                  +-----------------------------------+
 !/
 !/    13-Jun-2005 : Origination.                       ( version 3.07 )
@@ -31,8 +31,6 @@
 !/                  within allowed bounds.             ( version 5.15 )
 !/    06-Jun-2018 : add subroutine INIT_GET_JSEA_ISPROC_GLOB/add PDLIB 
 !/                                                     ( version 6.04 )
-!/    22-Mar-2021 : Support for air density input      ( version 7.xx )
-!/    28-Oct-2021 : Add SMC grid group indicator. JGLi ( version 7.xx )
 !/
 !/    Copyright 2009-2012 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -81,7 +79,6 @@
 !      NRGRD     Int.  Public   Number of grids.
 !      NRINP     Int.  Public   Number of input grids.
 !      NRGRP     Int.  Public   Number of groups.
-!      NGRPSMC   Int.  Public   SMC grid group number, one of 0:NRGRP. 
 !      NMVMAX    Int.  Public   Number of moving grid data.
 !      GRANK     I.A.  Public   Rank number for grid.
 !      GRGRP     I.A.  Public   Group number for grid.
@@ -124,7 +121,6 @@
 !                               and output for areas of grid overlap.
 !      IFLSTI    L.A.  Public   FLags for last ice per grid.
 !      IFLSTL    L.A.  Public   FLags for last level per grid.
-!      IFLSTR    L.A.  Public   FLags for last air density per grid.
 !
 !      MDATA     TYPE  Public   Data structure for grid dependent data.
 !      MDATAS    MDATA Public   Array of data structures.
@@ -158,7 +154,6 @@
 !                Log.  Public   Flags for array initializations.
 !      FLLSTI    Log.  Public   FLag for last ice per grid.
 !      FLLSTL    Log.  Public   FLag for last level per grid.
-!      FLLSTR    Log.  Public   FLag for last air density per grid.
 !
 !      NMV       Int.  Public   Number of moving grid data.
 !      TMV       I.A.  Public   Moving grid times.
@@ -276,6 +271,8 @@
 !
 !  6. Switches :
 !
+!     !/F90  FORTRAN 90 specific extensions.
+!
 !     !/S    Enable subroutine tracing.
 !     !/T    Enable test output
 !
@@ -299,8 +296,8 @@
                                  IMPROC = 1, NMPLOG = 1, NMPSCR = 1,  &
                                  NMPTST = 1, NMPERR = 1, NMPUPT = 1,  &
                                  STIME(2), ETIME(2), NRGRD, NRINP,    &
-                                 NRGRP, NMVMAX, NGRPSMC
-      INTEGER                 :: CLKDT1(8), CLKDT2(8), CLKDT3(8)
+                                 NRGRP, NMVMAX
+!/F90      INTEGER                 :: CLKDT1(8), CLKDT2(8), CLKDT3(8)
 !/MPRF      INTEGER                 :: MDSP
 !/MPI      INTEGER                 :: MPI_COMM_MWAVE
 !/MPI      INTEGER, PARAMETER      :: MTAGB = 0
@@ -315,11 +312,11 @@
                                  TOUTP(:,:), TDATA(:,:), GRSTAT(:),   &
                                  NBI2G(:,:), INPMAP(:,:)
 !/MPI      INTEGER, ALLOCATABLE    :: NBISTA(:), HGHSTA(:), EQLSTA(:)
-      REAL                    :: CLKFIN
+!/F90      REAL                    :: CLKFIN
       REAL, ALLOCATABLE       :: DTRES(:)
       LOGICAL                 :: FLGBDI=.FALSE., FLGHG1, FLGHG2
       LOGICAL, ALLOCATABLE    :: RESPEC(:,:), BCDUMP(:),              &
-                                 IFLSTI(:), IFLSTL(:), IFLSTR(:)
+                                 IFLSTI(:), IFLSTL(:)
       CHARACTER(LEN=3), ALLOCATABLE :: IDINP(:,:)
 !/
 !/ Data structures
@@ -335,8 +332,8 @@
                                  AMV(:,:), DMV(:,:)
         REAL, POINTER         :: MAPBDI(:,:), MAPODI(:,:)
 !/PDLIB     INTEGER, POINTER    :: SEA_IPGL(:), SEA_IPGL_TO_PROC(:)
-        LOGICAL               :: MINIT, MSKINI, FLLSTL, FLLSTR,       &
-                                 FLLSTI, FLDAT0, FLDAT1, FLDAT2
+        LOGICAL               :: MINIT, MSKINI, FLLSTL, FLLSTI,       &
+                                 FLDAT0, FLDAT1, FLDAT2
 !/MPI        LOGICAL               :: FBCAST
       END TYPE MDATA
 !
@@ -389,7 +386,7 @@
                                  AMV(:,:), DMV(:,:)
       REAL, POINTER           :: MAPBDI(:,:), MAPODI(:,:)
 !/PDLIB      INTEGER, POINTER    :: SEA_IPGL(:), SEA_IPGL_TO_PROC(:)
-      LOGICAL, POINTER        :: MINIT, FLLSTL, FLLSTR, FLLSTI,       &
+      LOGICAL, POINTER        :: MINIT, FLLSTL, FLLSTI,               &
                                  FLDAT0, FLDAT1, FLDAT2
 !/MPI      LOGICAL, POINTER        :: FBCAST
 !/
@@ -401,7 +398,7 @@
 !/                  | WAVEWATCH III           NOAA/NCEP |
 !/                  |           H. L. Tolman            |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         22-Mar-2021 !
+!/                  | Last update :         10-Dec-2014 !
 !/                  +-----------------------------------+
 !/
 !/    22-Feb-2005 : Origination.                        ( version 3.07 )
@@ -412,7 +409,6 @@
 !/    12-Jan-2007 : Add FLSTI and FLLSTL.               ( version 3.10 )
 !/    22-Jan-2007 : Add NAVMAX.                         ( version 3.10 )
 !/    10-Dec-2014 : Add checks for allocate status      ( version 5.04 )
-!/    22-Mar-2021 : Support for air density input      ( version 7.xx )
 !/
 !  1. Purpose :
 !
@@ -487,7 +483,7 @@
       ALLOCATE ( MDATAS(NGRIDS), BPSTGE(NGRIDS,NGRIDS),               &
                  HGSTGE(NGRIDS,NGRIDS), EQSTGE(NGRIDS,NGRIDS),        &
                  BCDUMP(NRGRD), IFLSTI(NRINP), IFLSTL(NRINP),         &
-                 IFLSTR(NRINP), STAT=ISTAT )
+                 STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
 !/MPI      ALLOCATE ( NBISTA(NGRIDS), HGHSTA(NGRIDS), EQLSTA(NGRIDS), &
 !/MPI                 STAT=ISTAT )
@@ -503,7 +499,6 @@
 !
       IFLSTI = .FALSE.
       IFLSTL = .FALSE.
-      IFLSTR = .FALSE.
 !
       DO I=1, NGRIDS
         MDATAS(I)%MINIT  = .FALSE.
@@ -895,11 +890,10 @@
 !/                  | WAVEWATCH III           NOAA/NCEP |
 !/                  |           H. L. Tolman            |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         22-Mar-2021 !
+!/                  | Last update :         13-Jun-2005 !
 !/                  +-----------------------------------+
 !/
-!/    13-Jun-2005 : Origination.                       ( version 3.07 )
-!/    22-Mar-2021 : Support for air density input      ( version 7.xx )
+!/    13-Jun-2005 : Origination.                        ( version 3.07 )
 !/
 !  1. Purpose :
 !
@@ -1002,7 +996,6 @@
       MINIT  => MDATAS(IMOD)%MINIT
       FLLSTL => MDATAS(IMOD)%FLLSTL
       FLLSTI => MDATAS(IMOD)%FLLSTI
-      FLLSTR => MDATAS(IMOD)%FLLSTR
       MAPBDI => MDATAS(IMOD)%MAPBDI
       MAPODI => MDATAS(IMOD)%MAPODI
 !/PDLIB      SEA_IPGL => MDATAS(IMOD)%SEA_IPGL

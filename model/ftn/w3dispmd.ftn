@@ -926,6 +926,7 @@
 !/ ------------------------------------------------------------------- /
       USE CONSTANTS, ONLY: DWAT, TPI, GRAV
       USE W3GDATMD, ONLY: NK
+!/IS2 USE W3GDATMD, ONLY: IS2PARS
 !/S      USE W3SERVMD,  ONLY: STRACE
 !/
       IMPLICIT NONE
@@ -941,6 +942,8 @@
 !/ Local parameters
 !/S      INTEGER, SAVE     :: IENT = 0
       REAL, PARAMETER   :: E = 6.0E+9 ! Young's modulus of elasticity
+      REAL              :: YOUNG      ! Value of the modulus used,
+                                      ! not equal to E if w3sis2md is used (IS2)
       REAL, PARAMETER   :: S = 0.3    ! "s", Poisson's ratio
       REAL              :: DICE       ! "dice", density of ice
       REAL              :: B          ! quantifies effect of bending
@@ -959,8 +962,9 @@
       CG    = 0.
       ALPHA = 0.
       FREQ  = 0.
-      DICE = DWAT * 0.9 ! from Liu 1991 pg 4606
-
+      DICE  = DWAT * 0.9 ! from Liu 1991 pg 4606
+      YOUNG = E
+!/IS2 YOUNG = 5.49e9 ! -> Boutin et al. (2018)
 !/T38      WRITE(*,*)'REVERSE IN: H_ICE,VISC,H_WDEPTH,KWN,GET_CG = ', &
 !/T38                          H_ICE,VISC,H_WDEPTH,KWN,GET_CG
 
@@ -970,7 +974,7 @@
 ! Note: Liu et al 1991 have "kwn*h_ice" in COTH(_) but I believe they
 ! meant to write "kwn*H_wdepth"
 
-      B  = (E * H_ICE**3) / (12. * (1. - S**2) * DWAT)
+      B  = (YOUNG * H_ICE**3) / (12. * (1. - S**2) * DWAT)
       M  = DICE * H_ICE / DWAT
       KH = KWN * H_WDEPTH
       IF ( KH>5.0 ) THEN

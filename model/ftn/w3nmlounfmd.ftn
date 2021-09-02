@@ -7,7 +7,7 @@
 !/                  |           M. Accensi              |
 !/                  |                                   |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         12-Jan-2021 |
+!/                  | Last update :         15-May-2018 |
 !/                  +-----------------------------------+
 !/
 !/    For updates see subroutines.
@@ -32,15 +32,7 @@
     CHARACTER(1024)             :: LIST
     CHARACTER(15)               :: PARTITION
     LOGICAL                     :: SAMEFILE
-    LOGICAL                     :: VECTOR
     INTEGER                     :: TYPE
-    CHARACTER(15)               :: TIMEREF
-    LOGICAL                     :: FCVARS
-    CHARACTER                   :: TIMEVAR
-    CHARACTER                   :: TIMEUNIT
-    CHARACTER(15)               :: TIMEEPOCH
-    REAL                        :: NOVAL
-    LOGICAL                     :: MAPSTA
   END TYPE NML_FIELD_T
 
   ! file structure
@@ -61,6 +53,7 @@
     REAL                        :: EXO
     REAL                        :: EYO
     INTEGER                     :: CELFAC
+    REAL                        :: NOVAL
   END TYPE NML_SMC_T
 
   ! miscellaneous
@@ -79,7 +72,7 @@
 !/                  |           M. Accensi              |
 !/                  |                                   |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         12-Jan-2021 |
+!/                  | Last update :         15-May-2018 |
 !/                  +-----------------------------------+
 !/
 !
@@ -200,7 +193,7 @@
 !/                  |           M. Accensi              |
 !/                  |                                   |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         12-Jan-2021 |
+!/                  | Last update :         15-May-2018 |
 !/                  +-----------------------------------+
 !/
 !  1. Purpose :
@@ -251,7 +244,6 @@
     USE W3ODATMD, ONLY: NDSE
     USE W3SERVMD, ONLY: EXTCDE
 !/S      USE W3SERVMD, ONLY: STRACE
-    USE CONSTANTS, ONLY: UNDEF
 
     IMPLICIT NONE
 
@@ -275,15 +267,7 @@
     FIELD%LIST       = 'unset'
     FIELD%PARTITION  = '0 1 2 3'
     FIELD%SAMEFILE   = .TRUE.
-    FIELD%VECTOR     = .TRUE.
     FIELD%TYPE       = 3
-    FIELD%TIMEREF    = 'unset'
-    FIELD%FCVARS     = .FALSE.
-    FIELD%TIMEVAR    = 'D'
-    FIELD%TIMEUNIT   = 'D'
-    FIELD%TIMEEPOCH  = '19900101 000000'
-    FIELD%NOVAL      = UNDEF
-    FIELD%MAPSTA     = .TRUE.
 
     ! read field namelist
     REWIND (NDSI)
@@ -294,9 +278,6 @@
         'ERROR: '//TRIM(MSG)
       CALL EXTCDE (1)
     END IF
-
-    ! Default forecast reference time to start time
-    IF(FIELD%TIMEREF == 'unset') FIELD%TIMEREF = FIELD%TIMESTART
 
     ! save namelist
     NML_FIELD = FIELD
@@ -469,6 +450,7 @@
     USE W3ODATMD, ONLY: NDSE
     USE W3SERVMD, ONLY: EXTCDE
 !/S      USE W3SERVMD, ONLY: STRACE
+         USE CONSTANTS, ONLY: UNDEF
 
     IMPLICIT NONE
 
@@ -491,6 +473,7 @@
     SMC%EYO       = -999.9
     SMC%CELFAC    = 1
     SMC%TYPE      = 1
+    SMC%NOVAL     = UNDEF
 
     ! read smc namelist
     REWIND (NDSI)
@@ -589,16 +572,11 @@
       WRITE (NDSN,10) TRIM(MSG),'PARTITION  = ', TRIM(NML_FIELD%PARTITION)
       WRITE (NDSN,13) TRIM(MSG),'SAMEFILE   = ', NML_FIELD%SAMEFILE
       WRITE (NDSN,11) TRIM(MSG),'TYPE       = ', NML_FIELD%TYPE
-      WRITE (NDSN,10) TRIM(MSG),'FCVARS     = ', NML_FIELD%FCVARS
-      WRITE (NDSN,10) TRIM(MSG),'TIMEREF    = ', NML_FIELD%TIMEREF
-      WRITE (NDSN,14) TRIM(MSG),'NOVAL      = ', NML_FIELD%NOVAL
-      WRITE (NDSN,13) TRIM(MSG),'MAPSTA     = ', NML_FIELD%MAPSTA
 
 
 10  FORMAT (A,2X,A,A)
 11  FORMAT (A,2X,A,I8)
 13  FORMAT (A,2X,A,L1)
-14  FORMAT (A,2X,A,F8.2)
 
   END SUBROUTINE REPORT_FIELD_NML
 
@@ -764,6 +742,7 @@
       WRITE (NDSN,14) TRIM(MSG),'EXO       = ', NML_SMC%EXO
       WRITE (NDSN,14) TRIM(MSG),'EYO       = ', NML_SMC%EYO
       WRITE (NDSN,11) TRIM(MSG),'CELFAC    = ', NML_SMC%CELFAC
+      WRITE (NDSN,14) TRIM(MSG),'NOVAL     = ', NML_SMC%NOVAL
 
 11  FORMAT (A,2X,A,I12)
 14  FORMAT (A,2X,A,F8.2)

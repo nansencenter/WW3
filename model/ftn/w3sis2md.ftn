@@ -9,7 +9,7 @@
 !/                  |           C. Sevigny              |
 !/                  |           G. Boutin               |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         21-Jan-2018 |
+!/                  | Last update :         29-Jan-2019 |
 !/                  +-----------------------------------+
 !/
 !/    For updates see W3SID1 documentation.
@@ -574,7 +574,7 @@ ELSE
 !/
       END SUBROUTINE INSIS2
 !/ ------------------------------------------------------------------- /
-      SUBROUTINE W3SIS2 (A, DEPTH, CICE, ICEH, ICEF, ICEDMAX, IX, IY, &
+      SUBROUTINE W3SIS2 (A, DEPTH, CICE, ICEH, ICEF, ICEDMAX, ICEDAVE, IX, IY, &
                          S, D, DISSIP, WN, CG, WN_R, CG_ICE, R)
 !/
 !/                  +-----------------------------------+
@@ -594,6 +594,7 @@ ELSE
 !/    06-Feb-2016 : Added IICEHMIN and creep dissipation( version 5.10 ) 
 !/    10-Mar-2016 : Added depth and call to Liu disp.   ( version 5.10 )
 !/    02-May-2016 : Call to Liu disp moved to w3srce    ( version 5.10 )
+!/    29-Jan-2019 : Adapted to be coupled with neXtSIM  ( version 6.X )
 !
 !  1. Purpose :
 !     Wave scattering in the MIZ, adapted from Dumont et al.  
@@ -616,6 +617,7 @@ ELSE
 !       ICEH    Real  I     ice thickness
 !       ICEF    Real  I/O   Maximum floe size (updated)
 !       ICEDMAX Real  I     Maximum floe size
+!       ICEDAVE Real  I     Average floe size (from ice model/forcing)
 !       IX,IY   Int   I     Not used
 !       S       R.A.  O     Source term (1-D version)
 !       D       R.A.  O     Diagonal part of scattering (1-D version)
@@ -668,7 +670,7 @@ ELSE
       USE CONSTANTS, ONLY: TPIINV, PI, TPI, GRAV, DWAT
       USE W3SERVMD, ONLY: EXTCDE
       USE W3GDATMD, ONLY: NK, NTH, NSPEC, SIG, SIG2, DDEN, IS2PARS, XFR, &
-                          IICEHMIN,IICESMOOTH
+                          IICEHMIN,IICESMOOTH, IICEDISP
 !/T      USE W3ODATMD, ONLY: NDST
 !/S      USE W3SERVMD, ONLY: STRACE
 !/T      USE W3ARRYMD, ONLY: PRT2DS
@@ -678,10 +680,10 @@ ELSE
 !/
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
-      REAL, INTENT(IN)        :: A(NSPEC), DEPTH, CICE, ICEH, ICEDMAX
+      REAL, INTENT(IN)        :: A(NSPEC), DEPTH, CICE, ICEH, ICEDMAX, ICEDAVE
       INTEGER, INTENT(IN)     :: IX, IY
-      REAL, INTENT(OUT)       :: S(NSPEC), D(NSPEC), DISSIP(NSPEC), R(NK)
-      REAL, INTENT(INOUT)     :: ICEF
+      REAL, INTENT(OUT)       :: S(NSPEC), D(NSPEC), DISSIP(NSPEC)
+      REAL, INTENT(INOUT)     :: ICEF, R(NK)
       REAL, INTENT(IN)        :: WN(NK), CG(NK), WN_R(NK), CG_ICE(NK)
 
 !/
@@ -692,17 +694,16 @@ ELSE
       INTEGER                 :: IK, IKP1, IKM1, ITH, ITH2, IS, IS2, IND1, IND2
       REAL                    :: W
       INTEGER                 :: IKBREAK, NSUM
-      LOGICAL                 :: BRK_CRIT_W(NK), BRK_CRIT
+      LOGICAL                 :: BRK_CRIT_W(NK), BRK_CRIT, STR_CRIT
       REAL                    :: ALPHA, STRAIN_C, WAMP(NK), D_FLEX_FAIL,             &
                                  SMOOTHD, TAU_D, S_D(NK), ALPHA_D, DELTA_D,B_COLE,    &
                                  DMAX, S_ATT, FACTOR, BETA
-      REAL                    :: ICEDAVE(NK), CURVTOSTRAIN, CREEPFAC, MP2, B, ICEF_CREEP
+      REAL                    :: DAVE(NK), CURVTOSTRAIN, CREEPFAC, MP2, B, ICEF_CREEP
       REAL                    :: SUMALLDIR, SUMA, SUME, CURVSPEC(NK), ESPEC(NK),STRAIN
       REAL, PARAMETER         :: YOUNG = 5.49E+9   ! Young modulus 
       REAL, PARAMETER         :: POISSON = 0.3     ! Poisson Ratio 
       REAL                    :: SIGMA_C
       REAL, PARAMETER         :: DENS = 1025.0     ! ice density 
-      REAL                    :: GAMMA_TOY 
       REAL, DIMENSION(NK)        :: WN_I, WN_RP, WSQ, WLG, WLG_I, CG_I,   &
                                     CURV, CGRATIO, CG_EFF, DUMMY, ALPHA_DISP
 !/T      REAL                    :: SOUT(NK,NTH)
@@ -723,7 +724,6 @@ ELSE
       CG_EFF = 0.
       SIGMA_C = IS2PARS(19)
       MP2=(1-POISSON**2)
-      GAMMA_TOY =  2 + log(0.9)/log(2.)
       ! Variables from Cole et al. 1995
       ALPHA_D=0.54
       B_COLE=1.205E-9 * EXP(IS2PARS(24)*1.60218E-19/(1.38064852e-23*268.15))
@@ -746,26 +746,40 @@ ELSE
       ICEF_CREEP=ICEF
       DMAX = ICEF
       BRK_CRIT = .FALSE.
+      STR_CRIT = .FALSE.
       NSUM = NINT(0.3/(XFR-1.))
 !    
       STRAIN_C = SIGMA_C*MP2/YOUNG
 
 ! Minimum floe size that can break 
       D_FLEX_FAIL =  0.5* ( (PI**4*YOUNG*ICEH**3)/( 48*DENS*GRAV*MP2 ) )**.25 
-! Estimates mean floe diameter from max floe diameter 
+! Estimates mean floe diameter from max floe diameter
+! DAVE is the locally computed average floe size diameter (see Boutin et al. 2018). It is a function of
+! wave frequency in the case Dmin=2*PI/k*C_lambda 
       IF (DMAX.GT.NICED) THEN
-        ICEDAVE=DMAX
+        DAVE=DMAX
       ELSE
-        IF (IS2PARS(9).GT.0) THEN
-          ICEDAVE= ICEDAVETAB(MAX(1,NINT(DMAX)))
-        ELSE 
-          DO IK=1,NK
-            IF (IS2PARS(14)*(TPI/WN_R(IK)).LT.DMAX) THEN
-              ICEDAVE(IK)=W3FSD_DAVE( (TPI/WN_R(IK))*IS2PARS(14),DMAX,IS2PARS(8))
-            ELSE 
-              ICEDAVE(IK)=DMAX
-              ENDIF 
-            END DO
+! If not coupled with a sea ice model that sends information on fsd then
+! follows Boutin et al. 2018
+        IF (IS2PARS(25).LT.0.5) THEN
+          ! If IS2DMIN>0
+          IF (IS2PARS(9).GT.0) THEN  
+            DAVE= ICEDAVETAB(MAX(1,NINT(DMAX)))
+          ELSE 
+            DO IK=1,NK
+              IF (IS2PARS(14)*(TPI/WN_R(IK)).LT.DMAX) THEN
+                DAVE(IK)=W3FSD_DAVE( (TPI/WN_R(IK))*IS2PARS(14),DMAX,IS2PARS(8))
+              ELSE 
+                DAVE(IK)=DMAX
+                ENDIF 
+              END DO
+            ENDIF 
+        ELSE
+! If coupled with a sea ice model with its own fsd then floe size values are provided and should not be updated in ww3
+! This should be used if ice break-up is done elsewhere than in ww3
+          DMAX    = ICEDMAX
+          ICEF    = ICEDMAX
+          DAVE    = ICEDAVE
           ENDIF
         ENDIF
 !
@@ -818,7 +832,7 @@ ELSE
 
 ! Note by FA: dissipation should be done by ICx not by ISx 
 ! the RP damping is thus defined by an optional IS2PARS(7), which is 0 by default
-          ALPHA = -1.*(  (SIS2ALPHAS(IND1,IK)*(1-W)+SIS2ALPHAS(IND2,IK)*W)/ICEDAVE(IK) &
+          ALPHA = -1.*(  (SIS2ALPHAS(IND1,IK)*(1-W)+SIS2ALPHAS(IND2,IK)*W)/DAVE(IK) &
                         +2.*IS2PARS(7)*WN_RP(IK) )*CICE
 !
 ! Additional scattering for pack ice defined by IS2PARS(4:5)  (see Squire et al. GRL 2009)
@@ -861,8 +875,11 @@ ELSE
           ELSE 
             SMOOTHD=1.
             END IF
-!
-          R(IK) =1+IS2PARS(16)*SMOOTHD*4*YOUNG*ICEH**3*(PI/WLG_I(IK))**4/(3*DWAT*GRAV*MP2)
+!         Warning 2 : R is already computed if IICEDISP is TRUE and is therefore
+!         only recomputed here if IICESMOOTH needs to be accounted for 
+          IF ( (IICESMOOTH).OR. (.NOT.(IICEDISP)) ) THEN
+            R(IK) =1+IS2PARS(16)*SMOOTHD*4*YOUNG*ICEH**3*(PI/WLG_I(IK))**4/(3*DWAT*GRAV*MP2)
+            END IF ! NOT IICEDISP -> Compute R
 !
 ! Converting action to surface elevation variance SUME with units m^2
 !
@@ -900,16 +917,13 @@ ELSE
           IKBREAK=0
           DO IK = 1, NK 
             STRAIN = CURV(IK)*CURVTOSTRAIN                            
-            IF (D_FLEX_FAIL .LT. DMAX) THEN 
 ! Note that Williams et al. used IS2PARS(17)=SQRT(2), Here our default is 3.6
               WAMP(IK)= IS2PARS(17)*SQRT(STRAIN)
 !
-              IF (IS2PARS(9).EQ.0) THEN
-                ICEDMIN=(TPI/WN_R(IK))*IS2PARS(14)
-                END IF
+            IF (D_FLEX_FAIL .LT. DMAX) THEN
+              IF (IS2PARS(9).EQ.0) ICEDMIN=(TPI/WN_R(IK))*IS2PARS(14)
               BRK_CRIT_W(IK) = WAMP(IK) .GT. STRAIN_C .AND. WLG_I(IK)/2 .GT. ICEDMIN .AND. WLG_I(IK)/2 .LT. DMAX &
                                .AND. WLG_I(IK)/2 .GT. D_FLEX_FAIL
-
 !
               IF (BRK_CRIT_W(IK)) THEN
                 IKBREAK=IK
@@ -940,9 +954,19 @@ ELSE
                     +WLG_I(IKP1)*CURVSPEC(IKP1)+WLG_I(IKM1)*CURVSPEC(IKM1)) &
                     /(2.*(CURVSPEC(IKBREAK)+CURVSPEC(IKM1)+CURVSPEC(IKP1)))
               END IF
-!	
+! Update ICEF
             ICEF = DMAX
-            END IF
+            END IF ! BRK_CRIT
+
+! 4.c Coupling : If coupled with a sea ice model providing the FSD (and redistributing it)
+! then attenuation is computed with provided floe size (ICEF should not be updated in WW3)
+            IF (IS2PARS(25).GT.0.5) THEN
+              DMAX=ICEDMAX !DMAX is given by the ice model
+              ICEF=MIN(ICEF,1000.) !ICEF is sent to the ice model and considered as an information of the wavelength
+!! If max strain < crit strain, then send "no break-up" info
+!! No breakup-> ICEF= default value of ICEDMAX (1000), see Boutin et al. (2020)
+              IF ( .NOT.(STR_CRIT) ) ICEF=1000.
+              END IF
           END IF  !end of test  (IS2PARS(3).GT.0.5)
 !
 !  5. inelastic or anelastic dissipation 
@@ -961,7 +985,7 @@ ELSE
                                             *((2*PI)/WLG_I(IK))**(IS2PARS(15)+1) &
                                             /(CGRATIO(IK)**1*R(IK)**2)           &
                                             *SMOOTHD
-              ELSE ! this is the inelastic option
+              ELSE ! this is the anelastic option
                 DISSIP(1+(IK-1)*NTH:IK*NTH) =-4*4/3*SIG(IK)* DELTA_D*ALPHA_D *WN_I(IK)**4 * (YOUNG/MP2)**2         &
                                              * (ICEH/2)**3/3 * 1/( EXP(ALPHA_D*S_D(IK)) + EXP(-ALPHA_D*S_D(IK))) &
                                              * SMOOTHD /(R(IK)**2*CGRATIO(IK)) / (DWAT*GRAV) *TPIINV 

@@ -79,8 +79,11 @@
   # netcdf include dir
   if [ "$netcdf_compile" = 'yes' ]
   then
-    if [ "$mpi_mod" = 'no' ]; then comp="`$NETCDF_CONFIG --fc`"; fi
-    opt="$opt `$NETCDF_CONFIG --cflags`"
+    case $WWATCH3_NETCDF in
+      NC3) opt="$opt -I$NETCDF_INCDIR" ;;
+      NC4) if [ "$mpi_mod" = 'no' ]; then comp="`$NETCDF_CONFIG --fc`"; fi
+           opt="$opt -I`$NETCDF_CONFIG --includedir`" ;;
+    esac
   fi
 
   # ftn include dir

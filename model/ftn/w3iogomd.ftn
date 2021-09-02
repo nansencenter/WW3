@@ -6,7 +6,7 @@
 !/                  | WAVEWATCH III           NOAA/NCEP |
 !/                  |           H. L. Tolman            |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         22-Mar-2021 |
+!/                  | Last update :         03-Nov-2020 |
 !/                  +-----------------------------------+
 !/
 !/    04-Jan-2001 : Origination.                        ( version 2.00 )
@@ -57,9 +57,6 @@
 !/                  (Roberto Padilla-Hernandez & J.H. Alves)
 !/    03-Nov-2020 : Factored out NAME matching into     ( version 7.12 )
 !/                  seperate subroutine. (C. Bunney)
-!/    15-Jan-2020 : Added TP output based on exsiting   ( version 7.12 )
-!/                  FP internal field. (C. Bunney)
-!/    22-Mar-2021 : Add extra coupling fields as output ( version 7.xx )
 !/
 !/    Copyright 2009-2014 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -113,6 +110,8 @@
 !       !/DIST  Id.
 !
 !       !/OMPG  OpenMP compiler directive for loop splitting.
+!       !/C90   Cray FORTRAN 90 compiler directive.
+!       !/NEC   NEC SXF90 compiler directives.
 !
 !       !/O8    Filter for low wave heights ( HSMIN )
 !       !/O9    Negative wave height alowed, other mean parameters will
@@ -124,6 +123,7 @@
 !       !/ST3   Source term set 3 (WAM 4+)
 !       !/ST4   Source term set 4 (Ardhuin et al. 2009, 2010)
 !       !/ST6   Source term set 6 (BYDRZ)
+!       !/STX   Open source term slot (implemented as ST0).
 !
 !       !/S     Enable subroutine tracing.
 !       !/T     Test output.
@@ -672,11 +672,10 @@
 !/                  | WAVEWATCH III           NOAA/NCEP |
 !/                  |            C. Bunney              |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         22-Mar-2021 |
+!/                  | Last update :         03-Nov-2020 |
 !/                  +-----------------------------------+
 !/
 !/    03-Nov-2020 : Origination.                        ( version 7.12 )
-!/    22-Mar-2021 : Add extra coupling fields as output ( version 7.xx )
 !
 !  1. Purpose :
 !
@@ -733,19 +732,16 @@
       CASE('IBG')
         I = 1
         J = 7
-      CASE('TAU')
-        I = 1
-        J = 8
-      CASE('RHO')
-        I = 1
-        J = 9
 !/BT4           CASE('D50')
 !/BT4             I = 1
-!/BT4             J = 10
+!/BT4             J = 8
 !/IS2           CASE('IC1')
 !/IS2             I = 1
-!/IS2             J = 11
+!/IS2             J = 9
 !/IS2           CASE('IC5')
+!/IS2             I = 1
+!/IS2             J = 10
+!/IS2           CASE('IC3')
 !/IS2             I = 1
 !/IS2             J = 12
 ! Group 2
@@ -755,7 +751,7 @@
 !/OASACM           J = 1
 !/OASOCM         CASE('OHS')
 !/OASOCM           I = 2
-!/OASOCM           J = 1
+!/OASACM           J = 1
       CASE('HS')
         I = 2
         J = 1
@@ -807,12 +803,6 @@
       CASE('WBT')
         I = 2
         J = 17
-      CASE('TP') ! Uses FP0 internally, as per FP
-        I = 2
-        J = 18
-      CASE('WNM')
-        I = 2
-        J = 19
 !
 ! Group 3
 !
@@ -899,7 +889,7 @@
 !/OASACM           J = 2
 !/OASOCM         CASE('OCHA')
 !/OASOCM           I = 5
-!/OASOCM           J = 2
+!/OASACM           J = 2
       CASE('CHA')
         I = 5
         J = 2
@@ -977,9 +967,7 @@
         ELSE
           IF ( IAPROC .EQ. NAPOUT ) WRITE(NDSEN,1008) 'USP','USSP'
         END IF
-      CASE('TOC')
-        I = 6
-        J = 13
+
 !
 ! Group 7
 !
@@ -1142,6 +1130,8 @@
 !     !/SHRD  Switch for shared / distributed memory architecture.
 !     !/DIST  Id.
 !
+!     !/C90   Cray FORTRAN 90 compiler directives.
+!     !/NEC   NEC SXF90 compiler directives.
 !     !/OMPG  OpenMP compiler directive for loop splitting.
 !
 !     !/O8    Filter for low wave heights ( HSMIN )
@@ -1153,6 +1143,7 @@
 !     !/ST2   Source term set 2 (Tolman and Chalikov)
 !     !/ST3   Source term set 3 (WAM 4+)
 !     !/ST6   Source term set 6 (BYDRZ)
+!     !/STX   Open source term slot (implemented as ST0).
 !
 !     !/S     Enable subroutine tracing.
 !     !/T     Test output.
@@ -1940,6 +1931,15 @@
 !/ST6            FP1 (JSEA) = TPIINV * FP1TST
 !/ST6            IKP1(JSEA) = MAX ( 1 , NINT(FACTI2+FACTI1*LOG(FP1TST)) )
 !/ST6          END IF
+!/STX        FP1 (JSEA) = UNDEF
+!/STX        IKP1(JSEA) = NK
+!/STX        FPISTR     = MAX ( 0.003 , FPIS(ISEA) * UST(ISEA) / GRAV )
+!/STX        FP1STR     = 3.6E-4 + 0.92*FPISTR - 6.3E-10/FPISTR**3
+!/STX        FP1TST     = FP1STR / UST(ISEA) * GRAV
+!/STX        IF ( FP1TST.LE.SIG(NK) .AND. FP1TST.GT.SIG(1) ) THEN
+!/STX            FP1 (JSEA) = TPIINV * FP1TST
+!/STX            IKP1(JSEA) = MAX ( 1 , NINT(FACTI2+FACTI1*LOG(FP1TST)) )
+!/STX          END IF
         THP1(JSEA) = UNDEF
         END DO
 !
@@ -2053,6 +2053,8 @@
 !
       DO ITH=1, NTH
 !
+!/C90/!DIR$ IVDEP
+!/NEC/!CDIR NODEP
 !/OMPG/!$OMP PARALLEL DO PRIVATE(JSEA,ISEA)
 !
         DO JSEA=1, NSEAL
@@ -2083,6 +2085,8 @@
 !
       DO ITH=1, NTH
 !
+!/C90/!DIR$ IVDEP
+!/NEC/!CDIR NODEP
 !/OMPG/!$OMP PARALLEL DO PRIVATE(JSEA,ISEA)
 !
         DO JSEA=1, NSEAL
@@ -2287,7 +2291,7 @@
 !/                  | WAVEWATCH III           NOAA/NCEP |
 !/                  |           H. L. Tolman            |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         22-Mar-2021 |
+!/                  | Last update :         27-Nov-2013 |
 !/                  +-----------------------------------+
 !/
 !/    17-Mar-1999 : Distributed FORTRAN 77 version.     ( version 1.18 )
@@ -2317,7 +2321,6 @@
 !/    01-Mar-2018 : Removed RTD code (now used in post  ( version 6.02 )
 !/                  processing code)
 !/    25-Aug-2018 : Add WBT parameter                   ( version 6.06 )
-!/    22-Mar-2021 : Add extra coupling fields as output ( version 7.xx )
 !/
 !  1. Purpose :
 !
@@ -2398,11 +2401,10 @@
       USE W3ODATMD, ONLY: W3SETO
 !/
       USE W3WDATMD, ONLY: TIME, DINIT, WLV, ICE, ICEF, ICEH, BERG,    &
-                          UST,  USTDIR, ASF, RHOAIR
-      USE W3ADATMD, ONLY: AINIT, DW, UA, UD, AS, CX, CY, WN,          &
-                          TAUA, TAUADIR
+                          UST,  USTDIR, ASF
+      USE W3ADATMD, ONLY: AINIT, DW, UA, UD, AS, CX, CY, WN
       USE W3ADATMD, ONLY: HS, WLM, T02, T0M1, T01, FP0, THM, THS, THP0,&
-                          WBT, WNMEAN
+                          WBT
       USE W3ADATMD, ONLY: FP1, THP1, DTDYN, &
                           FCUT, ABA, ABD, UBA, UBD, SXX, SYY, SXY,     &
                           PHS, PTP, PLP, PDIR, PSI, PWS, PWST, PNR,    &
@@ -2415,7 +2417,7 @@
                           CFLXYMAX, CFLTHMAX, CFLKMAX, P2SMS, US3D,    &
                           TH1M, STH1M, TH2M, STH2M, HSIG, PHICE, TAUICE,&
                           STMAXE, STMAXD, HMAXE, HCMAXE, HMAXD, HCMAXD,&
-                          USSP, TAUOCX, TAUOCY
+                          USSP
 !/
       USE W3ODATMD, ONLY: NOGRP, NGRPP, IDOUT, UNDEF, NDST, NDSE,     &
                           FLOGRD, IPASS => IPASS1, WRITE => WRITE1,   &
@@ -2448,7 +2450,7 @@
 !/S      INTEGER, SAVE           :: IENT = 0
       REAL                    :: AUX1(NSEA), AUX2(NSEA),              &
                                  AUX3(NSEA), AUX4(NSEA)
-!/SMC      REAL                    :: UDARC
+!/ARC      REAL                    :: UDARC
       CHARACTER(LEN=30)       :: IDTST, TNAME
       CHARACTER(LEN=10)       :: VERTST
 !/
@@ -2654,8 +2656,7 @@
                 IF ( FLOGRD( 2, 3) ) T02   (ISEA) = UNDEF
                 IF ( FLOGRD( 2, 4) ) T0M1  (ISEA) = UNDEF
                 IF ( FLOGRD( 2, 5) ) T01   (ISEA) = UNDEF
-                IF ( FLOGRD( 2, 6) .OR. FLOGRD( 2,18) )                 &
-                                     FP0   (ISEA) = UNDEF  ! FP or TP
+                IF ( FLOGRD( 2, 6) ) FP0   (ISEA) = UNDEF
                 IF ( FLOGRD( 2, 7) ) THM   (ISEA) = UNDEF
                 IF ( FLOGRD( 2, 8) ) THS   (ISEA) = UNDEF
                 IF ( FLOGRD( 2, 9) ) THP0  (ISEA) = UNDEF
@@ -2669,7 +2670,6 @@
                 IF ( FLOGRD( 2,15) ) HMAXD (ISEA) = UNDEF
                 IF ( FLOGRD( 2,16) ) HCMAXD(ISEA) = UNDEF
                 IF ( FLOGRD( 2,17) ) WBT   (ISEA) = UNDEF
-                IF ( FLOGRD( 2,19) ) WNMEAN(ISEA) = UNDEF
 !
                 IF ( FLOGRD( 3, 1) ) EF   (ISEA,:) = UNDEF
                 IF ( FLOGRD( 3, 2) ) TH1M (ISEA,:) = UNDEF
@@ -2739,10 +2739,6 @@
                 IF ( FLOGRD( 6, 10) ) TAUICE(ISEA,:) = UNDEF
                 IF ( FLOGRD( 6, 11) ) PHICE(ISEA) = UNDEF
                 IF ( FLOGRD( 6, 12) ) USSP(ISEA,:) = UNDEF
-                IF ( FLOGRD( 6, 13) ) THEN
-                                     TAUOCX(ISEA) = UNDEF
-                                     TAUOCY(ISEA) = UNDEF
-                  END IF
 !
                 IF ( FLOGRD( 7, 1) ) THEN
                                      ABA   (ISEA) = UNDEF
@@ -2830,11 +2826,11 @@
                     WRITE ( NDSOG ) CY(1:NSEA)
                   ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 3 ) THEN
                     DO ISEA=1, NSEA
-!/SMC  !!Li  Rotate map-east wind in Arctic part back to local east.  JGLi02Feb2016
-!/SMC                      IF( ARCTC .AND. (ISEA .GT. NGLO) ) THEN
-!/SMC                        UDARC = UD(ISEA) - ANGARC(ISEA - NGLO)*DERA
-!/SMC                        UD(ISEA) = MOD(TPI + UDARC, TPI)
-!/SMC                      ENDIF
+!/ARC  !!Li  Rotate map-east wind in Arctic part back to local east.  JGLi02Feb2016
+!/ARC                      IF(ISEA .GT. NGLO) THEN
+!/ARC                        UDARC = UD(ISEA) - ANGARC(ISEA - NGLO)*DERA
+!/ARC                        UD(ISEA) = MOD(TPI + UDARC, TPI)
+!/ARC                      ENDIF
                       IF (UA(ISEA) .NE.UNDEF) THEN
                           AUX1(ISEA) = UA(ISEA)*COS(UD(ISEA))
                           AUX2(ISEA) = UA(ISEA)*SIN(UD(ISEA))
@@ -2853,32 +2849,13 @@
                     WRITE ( NDSOG ) ICE(1:NSEA)
                   ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 7 ) THEN
                     WRITE ( NDSOG ) BERG(1:NSEA)
-                  ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 8 ) THEN
-                    DO ISEA=1, NSEA
-!/SMC  !!Li  Rotate map-east momentum in Arctic part back to local east.  JGLi02Feb2016
-!/SMC                      IF( ARCTC .AND. (ISEA .GT. NGLO) ) THEN
-!/SMC                        UDARC = TAUADIR(ISEA) - ANGARC(ISEA - NGLO)*DERA
-!/SMC                        TAUADIR(ISEA) = MOD(TPI + UDARC, TPI)
-!/SMC                      ENDIF
-                      IF (TAUA(ISEA) .NE.UNDEF) THEN
-                          AUX1(ISEA) = TAUA(ISEA)*COS(TAUADIR(ISEA))
-                          AUX2(ISEA) = TAUA(ISEA)*SIN(TAUADIR(ISEA))
-                       ELSE
-                        AUX1(ISEA) = UNDEF
-                        AUX2(ISEA) = UNDEF
-                       END IF
-                      END DO
-                    WRITE ( NDSOG ) AUX1
-                    WRITE ( NDSOG ) AUX2
-                  ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 9 ) THEN
-                    WRITE ( NDSOG ) RHOAIR(1:NSEA)
-!/BT4                  ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 10 ) THEN
+!/BT4                  ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 8 ) THEN
 !/BT4                    WRITE ( NDSOG ) SED_D50(1:NSEA)
-!/IS2                  ELSE IF (IFI .EQ. 1 .AND. IFJ .EQ. 11 ) THEN
+!/IS2                  ELSE IF (IFI .EQ. 1 .AND. IFJ .EQ. 9 ) THEN
 !/IS2                    WRITE (NDSOG ) ICEH(1:NSEA)
-!/IS2                  ELSE IF (IFI .EQ. 1 .AND. IFJ .EQ. 12 ) THEN
+!/IS2                  ELSE IF (IFI .EQ. 1 .AND. IFJ .EQ. 10 ) THEN
 !/IS2                    WRITE (NDSOG ) ICEF(1:NSEA)
-!/SETUP                  ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 13 ) THEN
+!/SETUP                  ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 11 ) THEN
 !/SETUP                   WRITE ( NDSOG ) ZETA_SETUP(1:NSEA)
 
 !
@@ -2894,9 +2871,7 @@
                     WRITE ( NDSOG ) T0M1(1:NSEA)
                   ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 5 ) THEN
                     WRITE ( NDSOG ) T01(1:NSEA)
-                  ELSE IF ( (IFI .EQ. 2 .AND. IFJ .EQ. 6) .OR.         &
-                            (IFI .EQ. 2 .AND. IFJ .EQ. 18) ) THEN
-                    ! Note: TP output is derived from FP field.
+                  ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 6 ) THEN
                     WRITE ( NDSOG ) FP0(1:NSEA)
                   ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 7 ) THEN
                     WRITE ( NDSOG ) THM(1:NSEA)
@@ -2920,8 +2895,6 @@
                     WRITE ( NDSOG ) HCMAXD(1:NSEA)
                   ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 17 ) THEN
                     WRITE ( NDSOG ) WBT(1:NSEA)
-                  ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 19 ) THEN
-                    WRITE ( NDSOG ) WNMEAN(1:NSEA)
 !
 !     Section 3)
 !
@@ -3051,9 +3024,6 @@
                  ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 12 ) THEN
                     WRITE ( NDSOG ) USSP(1:NSEA,   1:USSPF(2))
                     WRITE ( NDSOG ) USSP(1:NSEA,NK+1:NK+USSPF(2))
-                 ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 13 ) THEN
-                    WRITE ( NDSOG ) TAUOCX(1:NSEA)
-                    WRITE ( NDSOG ) TAUOCY(1:NSEA)
 !
 !     Section 7)
 !
@@ -3152,18 +3122,13 @@
                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) ICE(1:NSEA)
                   ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 7 ) THEN
                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) BERG(1:NSEA)
-                  ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 8 ) THEN
-                    READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) TAUA(1:NSEA)
-                    READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) TAUADIR(1:NSEA)
-                  ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 9 ) THEN
-                    READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) RHOAIR(1:NSEA)
-!/BT4                   ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 10 ) THEN
+!/BT4                   ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 8 ) THEN
 !/BT4                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) SED_D50(1:NSEA)
-!/IS2                   ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 11 ) THEN
+!/IS2                   ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 9) THEN
 !/IS2                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) ICEH(1:NSEA)
-!/IS2                   ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 12 ) THEN
+!/IS2                   ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 10) THEN
 !/IS2                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) ICEF(1:NSEA)
-!/SETUP                 ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 13 ) THEN
+!/SETUP                 ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 11 ) THEN
 !/SETUP                   READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) ZETA_SETUP(1:NSEA)
 !
 !     Section 2)
@@ -3178,9 +3143,7 @@
                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) T0M1(1:NSEA)
                   ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 5 ) THEN
                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) T01(1:NSEA)
-                  ELSE IF ( (IFI .EQ. 2 .AND. IFJ .EQ. 6) .OR.       &
-                            (IFI .EQ. 2 .AND. IFJ .EQ. 18) ) THEN
-                    ! Note: TP output is derived from FP field.
+                  ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 6 ) THEN
                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) FP0(1:NSEA)
                   ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 7 ) THEN
                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) THM(1:NSEA)
@@ -3212,9 +3175,6 @@
                                                          HCMAXD(1:NSEA)
                   ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 17 ) THEN
                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) WBT(1:NSEA)
-                  ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 19 ) THEN
-                    READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)         &
-                                                         WNMEAN(1:NSEA)
 !
 !     Section 3)
 !
@@ -3384,11 +3344,6 @@
                                    USSP(1:NSEA,1:USSPF(2))
                      READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)  &
                                    USSP(1:NSEA,NK+1:NK+USSPF(2))
-                  ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 13 ) THEN
-                    READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)         &
-                                                       TAUOCX(1:NSEA)
-                    READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)         &
-                                                       TAUOCY(1:NSEA)
 
 !
 !     Section 7)
@@ -3633,6 +3588,8 @@
 !     !/SHRD  Switch for shared / distributed memory architecture.
 !     !/DIST  Id.
 !
+!     !/C90   Cray FORTRAN 90 compiler directives.
+!     !/NEC   NEC SXF90 compiler directives.
 !     !/OMPG  OpenMP compiler directive for loop splitting.
 !
 !     !/S     Enable subroutine tracing.
