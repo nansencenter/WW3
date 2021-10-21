@@ -918,7 +918,9 @@ ELSE
           DO IK = 1, NK 
             STRAIN = CURV(IK)*CURVTOSTRAIN                            
 ! Note that Williams et al. used IS2PARS(17)=SQRT(2), Here our default is 3.6
-              WAMP(IK)= IS2PARS(17)*SQRT(STRAIN)
+            WAMP(IK)= IS2PARS(17)*SQRT(STRAIN)
+! STR_CRIT is true is the (maximum) wave-induced strain is higher than the critical strain            
+            IF (WAMP(IK) .GT. STRAIN_C) STR_CRIT =.TRUE.
 !
             IF (D_FLEX_FAIL .LT. DMAX) THEN
               IF (IS2PARS(9).EQ.0) ICEDMIN=(TPI/WN_R(IK))*IS2PARS(14)
