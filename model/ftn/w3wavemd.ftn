@@ -437,7 +437,7 @@
 !/MPI      INTEGER, ALLOCATABLE    :: STATCO(:,:), STATIO(:,:)
       INTEGER                 :: IXrel
       REAL                    :: DTTST, DTTST1, DTTST2, DTTST3,       &
-                                 DTL0, DTI0, DTI10, DTI50,            &
+                                 DTL0, DTI0, DTI10, DTI30, DTI50,     &
                                  DTGA, DTG, DTGpre, DTRES,            &
                                  FAC, VGX, VGY, FACK, FACTH,          &
                                  FACX, XXX, REFLEC(4),                &
@@ -469,7 +469,7 @@
 !/IC3      REAL                    :: USE_CHENG, USE_CGICE, HICE
       LOGICAL                 :: UGDTUPDATE    ! true if time step should be updated for UG schemes
       CHARACTER(LEN=8)        :: STTIME
-      CHARACTER(LEN=17)       :: IDACT 
+      CHARACTER(LEN=18)       :: IDACT 
       CHARACTER(LEN=13)       :: OUTID
       CHARACTER(LEN=23)       :: IDTIME
       INTEGER eIOBP
@@ -707,7 +707,22 @@
         END IF
 !
 ! 1.e Ice floe interval
-!
+!  Average floe size
+!/IS2      IF ( FLIC3 ) THEN
+!/IS2          IF ( TIC3(1) .GE. 0 ) THEN
+!/IS2              DTI30   = DSEC21 ( TIC3 , TI3 )
+!/IS2            ELSE
+!/IS2              DTI30   = 1.
+!/IS2            END IF
+!/IS2!/T          WRITE (NDST,9016) DTI30
+!/IS2          IF ( DTI30 .LT. 0. ) THEN
+!/IS2              IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,1006)
+!/IS2              CALL EXTCDE ( 5 )
+!/IS2            END IF
+!/IS2        ELSE
+!/IS2          DTI30   = 0.
+!/IS2        END IF
+!  Maximum floe size
 !/IS2      IF ( FLIC5 ) THEN
 !/IS2          IF ( TIC5(1) .GE. 0 ) THEN
 !/IS2              DTI50   = DSEC21 ( TIC5 , TI5 )
@@ -1183,7 +1198,30 @@
 
 !
 ! 3.3.3 Update ice floe diameter
+! Average floe size
+!/IS2          IF ( FLIC3 .AND. DTI30.NE.0. ) THEN
 !
+!/IS2              IF ( TIC3(1).GE.0 ) THEN
+!/IS2                  IF ( DTI30 .LT. 0. ) THEN
+!/IS2                      IDACT(18:18) = 'B'
+!/IS2                    ELSE
+!/IS2                      DTTST  = DSEC21 ( TIME, TI3 )
+!/IS2                      IF ( DTTST .LE. 0.5*DTI30 ) IDACT(18:18) = 'U'
+!/IS2                    END IF
+!/IS2                ELSE
+!/IS2                  IDACT(18:18) = 'I'
+!/IS2                END IF
+!
+!/IS2              IF ( IDACT(18:18).NE.' ' ) THEN
+!/IS2               CALL W3UIC3( FLFRST )
+!/IS2                  DTI30   = 0.
+!/IS2                  FLACT  = .TRUE.
+!/IS2                  FLMAP  = .TRUE.
+!/IS2                END IF
+!
+!/IS2            END IF
+!
+! Maximum floe size
 !/IS2          IF ( FLIC5 .AND. DTI50.NE.0. ) THEN
 !
 !/IS2              IF ( TIC5(1).GE.0 ) THEN

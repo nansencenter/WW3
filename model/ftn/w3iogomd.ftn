@@ -2401,7 +2401,7 @@
       USE W3ODATMD, ONLY: W3SETO
 !/
       USE W3WDATMD, ONLY: TIME, DINIT, WLV, ICE, ICEF, ICEH, BERG,    &
-                          UST,  USTDIR, ASF
+                          UST,  USTDIR, ASF, ICEDAVE
       USE W3ADATMD, ONLY: AINIT, DW, UA, UD, AS, CX, CY, WN
       USE W3ADATMD, ONLY: HS, WLM, T02, T0M1, T01, FP0, THM, THS, THP0,&
                           WBT
@@ -2857,6 +2857,8 @@
 !/IS2                    WRITE (NDSOG ) ICEF(1:NSEA)
 !/SETUP                  ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 11 ) THEN
 !/SETUP                   WRITE ( NDSOG ) ZETA_SETUP(1:NSEA)
+!/IS2                  ELSE IF (IFI .EQ. 1 .AND. IFJ .EQ. 12 ) THEN
+!/IS2                    WRITE (NDSOG ) ICEDAVE(1:NSEA)
 
 !
 !     Section 2)
@@ -3130,6 +3132,8 @@
 !/IS2                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) ICEF(1:NSEA)
 !/SETUP                 ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 11 ) THEN
 !/SETUP                   READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) ZETA_SETUP(1:NSEA)
+!/IS2                   ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 12) THEN
+!/IS2                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR) ICEDAVE(1:NSEA)
 !
 !     Section 2)
 !

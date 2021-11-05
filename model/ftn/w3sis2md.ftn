@@ -773,7 +773,7 @@ ELSE
                 DAVE(IK)=DMAX
                 ENDIF 
               END DO
-            ENDIF 
+            ENDIF
         ELSE
 ! If coupled with a sea ice model with its own fsd then floe size values are provided and should not be updated in ww3
 ! This should be used if ice break-up is done elsewhere than in ww3
@@ -1001,7 +1001,7 @@ ELSE
 !      
       ELSE 
         DMAX = 0.
-        ICEF = 0. 
+        ICEF = 0.
         END IF   ! end of test  (CICE .GT. 0 .AND. ICEDAVE .GT. 0)  
 !
 !/T         DO IK = 1, NK
